@@ -1,0 +1,232 @@
+/***********************************************************************
+ * MODULE: photo
+ * FILE:   HTML.goh
+ *
+ ***********************************************************************
+ *
+ * WebPhotos
+ * Copyright (C) 2000-2004 Jörg Polzfuß
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation. EXCEPTION: This doesn't
+ * include my programer's ID (16457) as used for the tokenid in the
+ * .gp-file! Please use your own ID or the MANUFACTURER_ID_SDK (8)
+ * or MANUFACTURER_ID_SHAREWARE (9) instead!
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ *
+ ***********************************************************************/
+                 
+char* convertGeosCharToHTMLChar(unsigned char c)
+{
+	char *output=(char*)malloc(sizeof(char)*255);
+	if (!output)
+		return 0;
+	
+	switch (c)
+	{
+	  case C_QUOTE: sprintf(output,"&quot;"); break;
+	  case C_AMPERSAND: sprintf(output,"&amp;"); break;
+	  case C_LESS_THAN: sprintf(output,"&lt;"); break;
+	  case C_GREATER_THAN: sprintf(output,"&gt;"); break;
+	  case C_BACKSLASH: sprintf(output,"\\"); break;
+	  case C_UA_DIERESIS: sprintf(output,"&Auml;"); break;
+	  case C_UA_RING: sprintf(output,"&Aring;"); break;
+	  case C_UC_CEDILLA: sprintf(output,"&Ccedil;"); break;
+	  case C_UE_ACUTE: sprintf(output,"&Eacute;"); break;
+	  case C_UN_TILDE: sprintf(output,"&Ntilde;"); break;
+	  case C_UO_DIERESIS: sprintf(output,"&Ouml;"); break;
+	  case C_UU_DIERESIS: sprintf(output,"&Uuml;"); break;
+	  case C_LA_ACUTE: sprintf(output,"&aacute;"); break;
+	  case C_LA_GRAVE: sprintf(output,"&agrave;"); break;
+	  case C_LA_CIRCUMFLEX: sprintf(output,"&acirc;"); break;
+	  case C_LA_DIERESIS: sprintf(output,"&auml;"); break;
+	  case C_LA_TILDE: sprintf(output,"&atilde;"); break;
+	  case C_LA_RING: sprintf(output,"&aring;"); break;
+	  case C_LC_CEDILLA: sprintf(output,"&ccedil;"); break;
+	  case C_LE_ACUTE: sprintf(output,"&eacute;"); break;
+	  case C_LE_GRAVE: sprintf(output,"&egrave;"); break;
+	  case C_LE_CIRCUMFLEX: sprintf(output,"&ecirc;"); break;
+	  case C_LE_DIERESIS: sprintf(output,"&euml;"); break;
+	  case C_LI_ACUTE: sprintf(output,"&iacute;"); break;
+	  case C_LI_GRAVE: sprintf(output,"&igrave;"); break;
+	  case C_LI_CIRCUMFLEX: sprintf(output,"&icirc;"); break;
+	  case C_LI_DIERESIS: sprintf(output,"&iuml;"); break;
+	  case C_LN_TILDE: sprintf(output,"&ntilde;"); break;
+	  case C_LO_ACUTE: sprintf(output,"&oacute;"); break;
+	  case C_LO_GRAVE: sprintf(output,"&ograve;"); break;
+	  case C_LO_CIRCUMFLEX: sprintf(output,"&ocirc;"); break;
+	  case C_LO_DIERESIS: sprintf(output,"&ouml;"); break;
+	  case C_LO_TILDE: sprintf(output,"&otilde;"); break;
+	  case C_LU_ACUTE: sprintf(output,"&uacute;"); break;
+	  case C_LU_GRAVE: sprintf(output,"&ugrave;"); break;
+	  case C_LU_CIRCUMFLEX: sprintf(output,"&ucirc;"); break;
+	  case C_LU_DIERESIS: sprintf(output,"&uuml;"); break;
+	  case C_DAGGER: sprintf(output,"&dagger;"); break;
+	  case C_DEGREE: sprintf(output,"&deg;"); break;
+	  case C_CENT: sprintf(output,"&cent;"); break;
+	  case C_STERLING: sprintf(output,"&pound;"); break;
+	  case C_SECTION: sprintf(output,"&sect;"); break;
+	  case C_BULLET: sprintf(output,"&bull;"); break;
+	  case C_PARAGRAPH: sprintf(output,"&para;"); break;
+	  case C_GERMANDBLS: sprintf(output,"&szlig;"); break;
+	  case C_REGISTERED: sprintf(output,"&reg;"); break;
+	  case C_COPYRIGHT: sprintf(output,"&copy;"); break;
+	  case C_TRADEMARK: sprintf(output,"&trade;"); break;
+	  case C_ACUTE: sprintf(output,"&acute;"); break;
+	  case C_DIERESIS: sprintf(output,"&uml;"); break;
+	  case C_NOTEQUAL: sprintf(output,"&ne;"); break;
+	  case C_U_AE: sprintf(output,"&AElig;"); break;
+	  case C_UO_SLASH: sprintf(output,"&Oslash;"); break;
+	  case C_INFINITY: sprintf(output,"&infin;"); break;
+	  case C_PLUSMINUS: sprintf(output,"&plusmn;"); break;
+	  case C_LESSEQUAL: sprintf(output,"&le;"); break;
+	  case C_GREATEREQUAL: sprintf(output,"&ge;"); break;
+	  case C_YEN: sprintf(output,"&yen;"); break;
+	  case C_L_MU: sprintf(output,"&mu;"); break;
+	  case C_L_DELTA: sprintf(output,"&delta;"); break;
+	  case C_U_SIGMA: sprintf(output,"&Sigma;"); break;
+	  case C_U_PI: sprintf(output,"&Pi;"); break;
+	  case C_L_PI: sprintf(output,"&pi;"); break;
+	  case C_INTEGRAL: sprintf(output,"&int;"); break;
+	  case C_ORDFEMININE: sprintf(output,"&ordf;"); break;
+	  case C_ORDMASCULINE: sprintf(output,"&ordm;"); break;
+	  case C_U_OMEGA: sprintf(output,"&Omega;"); break;
+	  case C_L_AE: sprintf(output,"&aelig;"); break;
+	  case C_LO_SLASH: sprintf(output,"&oslash;"); break;
+	  case C_QUESTIONDOWN: sprintf(output,"&iquest;"); break;
+	  case C_EXCLAMDOWN: sprintf(output,"&iexcl;"); break;
+	  case C_LOGICAL_NOT: sprintf(output,"&not;"); break;
+	  case C_ROOT: sprintf(output,"&radic;"); break;
+	  case C_FLORIN: sprintf(output,"Florin"); break;
+	  case C_APPROX_EQUAL: sprintf(output,"&cong;"); break;
+	  case C_U_DELTA: sprintf(output,"&Delta;"); break;
+	  case C_GUILLEDBLLEFT: sprintf(output,"&laquo;"); break;
+	  case C_GUILLEDBLRIGHT: sprintf(output,"&raquo;"); break;
+	  case C_ELLIPSIS: sprintf(output,"..."); break;
+	  case C_NONBRKSPACE: sprintf(output,"&nbsp;"); break;
+	  case C_UA_GRAVE: sprintf(output,"&Agrave;"); break;
+	  case C_UA_TILDE: sprintf(output,"&Atilde;"); break;
+	  case C_UO_TILDE: sprintf(output,"&Otilde;"); break;
+	  case C_U_OE: sprintf(output,"&OElig;"); break;
+	  case C_L_OE: sprintf(output,"&oelig;"); break;
+	  case C_ENDASH: sprintf(output,"&ndash;"); break;
+	  case C_EMDASH: sprintf(output,"&mdash;"); break;
+	  case C_QUOTEDBLLEFT: sprintf(output,"&ldquo;"); break;
+	  case C_QUOTEDBLRIGHT: sprintf(output,"&rdquo;"); break;
+	  case C_QUOTESNGLEFT: sprintf(output,"&lsquo;"); break;
+	  case C_QUOTESNGRIGHT: sprintf(output,"&rsquo;"); break;
+	  case C_DIVISION: sprintf(output,"&divide;"); break;
+	  case C_DIAMONDBULLET: sprintf(output,"&diams;"); break;
+	  case C_LY_DIERESIS: sprintf(output,"&yuml;"); break;
+	  case C_UY_DIERESIS: sprintf(output,"&Yuml;"); break;
+	  case C_FRACTION: sprintf(output,"&frasl;"); break;
+	  case C_CURRENCY: sprintf(output,"&curren;"); break;
+	  case C_GUILSNGLEFT: sprintf(output,"&lsaquo;"); break;
+	  case C_GUILSNGRIGHT: sprintf(output,"&rsaquo;"); break;
+	  case C_LY_ACUTE: sprintf(output,"&yacute;"); break;
+	  case C_UY_ACUTE: sprintf(output,"&Yacute;"); break;
+	  case C_DBLDAGGER: sprintf(output,"&Dagger;"); break;
+	  case C_CNTR_DOT: sprintf(output,"&middot;"); break;
+	  case C_SNGQUOTELOW: sprintf(output,"&sbquo;"); break;
+	  case C_DBLQUOTELOW: sprintf(output,"&rbquo;"); break;
+	  case C_PERTHOUSAND: sprintf(output,"&permil;"); break;
+	  case C_UA_CIRCUMFLEX: sprintf(output,"&Acirc;"); break;
+	  case C_UE_CIRCUMFLEX: sprintf(output,"&Ecirc;"); break;
+	  case C_UA_ACUTE: sprintf(output,"&Aacute;"); break;
+	  case C_UE_DIERESIS: sprintf(output,"&Euml;"); break;
+	  case C_UE_GRAVE: sprintf(output,"&Egrave;"); break;
+	  case C_UI_ACUTE: sprintf(output,"&Iacute;"); break;
+	  case C_UI_CIRCUMFLEX: sprintf(output,"&Icirc;"); break;
+	  case C_UI_DIERESIS: sprintf(output,"&Iuml;"); break;
+	  case C_UI_GRAVE: sprintf(output,"&Igrave;"); break;
+	  case C_UO_ACUTE: sprintf(output,"&Oacute;"); break;
+	  case C_UO_CIRCUMFLEX: sprintf(output,"&Ocirc;"); break;
+	  case C_LOGO: sprintf(output,"&loz;"); break;
+	  case C_UO_GRAVE: sprintf(output,"&Ograve;"); break;
+	  case C_UU_ACUTE: sprintf(output,"&Uacute;"); break;
+	  case C_UU_CIRCUMFLEX: sprintf(output,"&Ucirc;"); break;
+	  case C_UU_GRAVE: sprintf(output,"&Ugrave;"); break;
+	  case C_LI_DOTLESS: sprintf(output,"<i>i dotless</i>"); break;
+	  case C_CIRCUMFLEX: sprintf(output,"&circ;"); break;
+	  case C_TILDE: sprintf(output,"&tilde;"); break;
+	  case C_MACRON: sprintf(output,"&macr;"); break;
+	  case C_BREVE: sprintf(output,"<i>breve</i>"); break;
+	  case C_DOTACCENT: sprintf(output,"<i>dot accent</i>"); break;
+	  case C_RING: sprintf(output,"&ring;"); break;
+	  case C_CEDILLA: sprintf(output,"&cedil;"); break;
+	  case C_HUNGARUMLAT: sprintf(output,"<i>Hungarian umlaut</i>"); break;
+	  case C_OGONEK: sprintf(output,"<i>ogonek</i>"); break;
+	  case C_CARON: sprintf(output,"<i>caron</i>"); break;
+
+	  default: sprintf(output,"%c",c);
+	}
+		
+	return output;
+}
+
+char* convertGeosStringToHTMLString(char* in)
+{
+	char* result = (char*)malloc(sizeof(char)*255);
+	char* temp   = 0;
+	int   i      = 0;
+	int   count  = strlen(in);
+	
+	if(!result)
+		return 0;
+	sprintf(result,"");
+	
+	for (i=0; i<count; ++i)
+	{
+		temp=convertGeosCharToHTMLChar(in[i]);
+		if (temp)
+			strcat(result,temp);
+		free(temp);
+	}
+
+	return result;
+}
+
+word writeCharAsHtmlCode(FileHandle fh, unsigned char c, Boolean noErrorFlag)
+{
+	int outLength=0;
+	word wResult=-1;
+	char *output=convertGeosCharToHTMLChar(c);
+	if (!output)
+		return wResult;
+
+	outLength=strlen(output);
+	wResult=FileWrite(fh,output,outLength,noErrorFlag);
+	free(output);
+
+	if (wResult!=outLength)
+		wResult=-1;
+	return wResult;
+}
+
+word FileWriteStringAsHTMLText( FileHandle      fh,          /* handle of open file */
+															  const char    * buf,         /* Copy from here into file */
+															  word            count,       /* # of bytes to copy */
+															  Boolean         noErrorFlag) /* Set if can't handle errors */
+{
+	word wResult=0, wTempResult=0;
+	word i;
+
+	for (i=0; i<count; ++i)
+	{
+		wTempResult=writeCharAsHtmlCode(fh,buf[i],noErrorFlag);
+		if (wTempResult<1)
+			return -1;
+		wResult+=wTempResult;
+	}
+
+	return wResult;
+}
