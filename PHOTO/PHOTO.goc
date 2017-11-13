@@ -1,0 +1,1875 @@
+/***********************************************************************
+ * MODULE: photo
+ * FILE:   photo.goc
+ *
+ ***********************************************************************
+ *
+ * WebPhotos
+ * Copyright (C) 2000-2004 Jörg Polzfuß
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation. EXCEPTION: This doesn't
+ * include my programer's ID (16457) as used for the tokenid in the
+ * .gp-file! Please use your own ID or the MANUFACTURER_ID_SDK (8)
+ * or MANUFACTURER_ID_SHAREWARE (9) instead!
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ *
+ ***********************************************************************/
+                 
+/*
+ ***************************************************************************
+ *		Include files
+ ***************************************************************************
+ */
+
+@include <stdapp.goh>
+#include <initfile.h>
+#include <math.h>
+#include <gstring.h>
+#include <graphics.h>
+#include <char.h>
+#include <ansi\string.h>
+#include <ansi\stdio.h>
+#include <ansi\stdlib.h>
+#include <ansi\ctype.h>
+#include "HTML.goh"
+
+/*
+ ***************************************************************************
+ *		definitions and global variables/constants
+ ***************************************************************************
+ */
+
+#define MYFILELENGTH (FILE_LONGNAME_BUFFER_SIZE + 1)
+
+typedef char DosDotFileNameZT[MYFILELENGTH];
+
+typedef char name[MYFILELENGTH];
+typedef char comment[255];
+
+typedef struct {
+  DosDotFileNameZT dosName;
+  name PhotoName;
+  comment PhotoComment;
+  int height;
+  int width;
+} PhotoDef;
+
+/*global vars*/
+word       actphoto=0;
+word       actselection=0;
+PhotoDef  *photos;
+Boolean    bFirst=TRUE;
+Boolean    bOverwrite=TRUE;
+word       numHTM=0;
+Boolean    bCreateAllPicsPage=FALSE;
+Boolean    bHRAboveAllPicsLink=FALSE;
+Boolean    bHRBelowAllPicsLink=FALSE;
+Boolean    bHRAboveTitle=FALSE;
+Boolean    bHRBelowTitle=FALSE;
+Boolean    bHRAboveComment=FALSE;
+Boolean    bHRBelowComment=FALSE;
+Boolean    bHROnAllPicsPage=FALSE;
+word       wHRWidth=80;
+Boolean    bUnorderedList=TRUE;
+Boolean    bOrderedList=FALSE;
+Boolean    bOrderedLista=FALSE;
+Boolean    bOrderedListA=FALSE;
+Boolean    bOrderedListi=FALSE;
+Boolean    bOrderedListI=FALSE;
+Boolean    bNoList=FALSE;
+Boolean    bIndexCSVFound=FALSE;
+Boolean    bUseColors =FALSE;
+char       bgcolor[7] ={'F','F','F','F','F','F',0};
+char       text[7]    ={'0','0','0','0','0','0',0};
+char       link[7]    ={'0','0','0','0','F','F',0};
+char       vlink[7]   ={'8','0','0','0','8','0',0};
+char       alink[7]   ={'F','F','F','F','0','0',0};
+char       tabbgcolor[7] ={'F','F','F','F','F','F',0};
+Boolean    bBackground=FALSE;
+char       backgroundPath[255];
+Boolean    bRobotsAll=FALSE;
+Boolean    bRobotsIndex=FALSE;
+Boolean    bRobotsFollow=FALSE;
+Boolean    bUseTables=FALSE;
+int        nTabBoders=5;
+
+/*
+ ***************************************************************************
+ *		Class & Message Definitions
+ ***************************************************************************
+ */
+@class	PhotoProcessClass, GenProcessClass;
+
+@message (GEN_DYNAMIC_LIST_QUERY_MSG) MSG_GDLP_LIST_MONIKER_QUERY;
+/*
+ * Parameters: void (optr list, word item)
+ *
+ * Queries the destination for the moniker for the given item.
+ *
+ */
+
+@message (GEN_ITEM_GROUP_APPLY_MSG) MSG_GDLP_LIST_APPLY;
+/*
+ * Parameters: void (word selection, word numSelections, word flags)
+ *
+ * Sent to the destination when a user change is applied to the list.
+ *
+ */
+
+@message void MSG_PHOTO_UP();
+/* moves selected photo up in the list */
+
+@message void MSG_PHOTO_DOWN();
+/* moves selected photo down in the list */
+
+@message void MSG_PHOTO_EXIT();
+/* exits the application (hopefully ;-)  */
+
+@message void MSG_CLEAR_ALL_COMMENTS();
+/* clears all comments */
+
+@message void MSG_PHOTO_SAVE();
+/* saves the work ;-)  */
+                     
+@message void MSG_CHANGE_COLOURS();
+/* pops up the colour-settings-dialog */
+                     
+@message void MSG_CHANGE_BACKGROUND();
+/* pops up the background-settings-dialog */
+
+@message void MSG_SHOW_TABLEOPTIONS();
+/* pops up the table-options-dialog */
+
+@message void MSG_CHANGE_HRWIDTH();
+/* pops up the <HR>-width-settings-dialog */
+
+@message void MSG_PHOTO_ABOUT();
+/* pops up the about-dialog */
+
+@endc;   /* end of class definition */
+
+@classdecl	PhotoProcessClass, neverSaved;
+
+/*
+ ***************************************************************************
+ *		UI Objects
+ ***************************************************************************
+ */
+
+@start	AppResource;
+
+@object GenApplicationClass PhotoApp = {
+  GI_visMoniker = list { @PhotoTextMoniker, @Moniker0, @Moniker1, @Moniker2 }
+  GI_comp = @PhotoPrimary;
+  gcnList(MANUFACTURER_ID_GEOWORKS,GAGCNLT_WINDOWS) = @PhotoPrimary;
+  gcnList(MANUFACTURER_ID_GEOWORKS, GAGCNLT_SELF_LOAD_OPTIONS) = @PhotoEditControl;
+  HINT_APP_IS_PRODUCTIVITY_ORIENTED;
+  ATTR_GEN_HELP_FILE = "WebPhotos Helpfile";
+}
+
+@visMoniker PhotoTextMoniker = "WebPhotos";
+
+@end	AppResource;
+
+@include "MONIKER.goh"
+@include "PHOTOUI.goh"
+
+/*
+ ***************************************************************************
+ * FUNCTIONS
+ ***************************************************************************
+ */
+
+void createCSVFile(FileHandle fh)
+{
+	int i;
+	char crlf[2];
+	char *output=(char*)malloc(sizeof(char)*255);
+	if (!output)
+		return;
+	crlf[0]=13;
+	crlf[1]=10;
+	for (i=0; i < actphoto; ++i)
+	{
+		FileWrite(fh,"\"",1,FALSE);
+		FileWrite(fh,photos[i].dosName,strlen(photos[i].dosName),FALSE);
+		FileWrite(fh,"\",\"",3,FALSE);
+		FileWrite(fh,photos[i].PhotoName,strlen(photos[i].PhotoName),FALSE);
+		FileWrite(fh,"\",\"",3,FALSE);
+		FileWrite(fh,photos[i].PhotoComment,strlen(photos[i].PhotoComment),FALSE);
+		sprintf(output, "\",\"%d\",\"%d\"", photos[i].width, photos[i].height);
+		FileWrite(fh,output,strlen(output),FALSE);
+		FileWrite(fh,crlf,2,FALSE);
+	}
+	free(output);
+}
+
+void createHTMName(DosDotFileNameZT in, DosDotFileNameZT *result)
+{
+	int i=0, dotPos=0;
+	Boolean beforeDot=TRUE;
+
+	while (i<MYFILELENGTH)
+	{
+		result[0][i]=0;
+		if (beforeDot==TRUE)
+		{
+			result[0][i]=in[i];
+			if (in[i]=='.')
+			{
+				beforeDot=FALSE;
+				dotPos=i;
+			}
+		}
+		else
+		{
+			if (i==dotPos+1)
+				result[0][i]='H';
+			if (i==dotPos+2)
+				result[0][i]='T';
+			if (i==dotPos+3)
+				result[0][i]='M';
+		}
+		++i;
+	}
+}
+
+char* createLinkLine(name title, DosDotFileNameZT in)
+{                   
+	char *convTitle = convertGeosStringToHTMLString(title);
+	char *result    = (char*)malloc(sizeof(char)*255);
+	if (!(result && convTitle))
+	{
+		free(result);
+		free(convTitle);
+		return 0;
+	}
+	if (bNoList)
+		sprintf(result, "<a href=\"%s\" target=\"right\">%s</a><br>\n", in, convTitle);
+	else
+		sprintf(result, "<li><a href=\"%s\" target=\"right\">%s</a></li>\n", in, convTitle);
+	free(convTitle);
+	return result;
+}
+
+void createHTMLHeadStart(FileHandle fh, char* str, Boolean bIsFrameSet)
+{
+ 	char *output0= (char*)malloc(sizeof(char)*255);
+	char *output1= (char*)malloc(sizeof(char)*255);
+	char *output2= (char*)malloc(sizeof(char)*255);
+	char *output3= (char*)malloc(sizeof(char)*255);
+	if (!(output0 && output1 && output2))
+	{
+		free(output0);
+		free(output1);
+		free(output2);
+		return;
+	}
+	if (bIsFrameSet)
+		sprintf(output0,"<!doctype html public \"-//w3c//dtd html 4.01 frameset//en\" \"http://www.w3.org/tr/html4/frameset.dtd\">\n");
+	else
+		sprintf(output0,"<!doctype html public \"-//w3c//dtd html 4.01 transitional//en\" \"http://www.w3.org/tr/html4/loose.dtd\">\n");
+	sprintf(output1,"<html>\n<head>\n<title>");
+	sprintf(output2,"</title>\n<meta http-equiv=\"content-type\" content=\"text/html; charset=iso-8559-1\">\n");
+	if (bRobotsAll)
+	{
+		sprintf(output3,"<meta name=\"robots\" content=\"all\">\n");
+	}
+	else
+	{
+		if(bRobotsIndex)
+		{
+			if(bRobotsFollow)
+				sprintf(output3,"<meta name=\"robots\" content=\"index,follow\">\n");
+			else
+				sprintf(output3,"<meta name=\"robots\" content=\"index,nofollow\">\n");
+		}
+		else
+		{
+			if(bRobotsFollow)
+				sprintf(output3,"<meta name=\"robots\" content=\"noindex,follow\">\n");
+			else
+				sprintf(output3,"<meta name=\"robots\" content=\"noindex,nofollow\">\n");
+		}
+	}
+	FileWrite(fh,output0,strlen(output0),FALSE);
+	FileWrite(fh,output1,strlen(output1),FALSE);
+	FileWriteStringAsHTMLText(fh,str,strlen(str),FALSE);
+	FileWrite(fh,output2,strlen(output2),FALSE);
+	FileWrite(fh,output3,strlen(output3),FALSE);
+	free(output0);
+	free(output1);
+	free(output2);
+	free(output3);
+}
+
+void createHTMLHeadEnd(FileHandle fh)
+{
+	char *output= (char*)malloc(sizeof(char)*255);
+	if (!output)
+		return;
+	sprintf(output,"</head>\n");
+	FileWrite(fh,output,strlen(output),FALSE);
+	free(output);
+}
+
+void createHTMLHead(FileHandle fh, char* str, Boolean bIsFrameSet)
+{
+	createHTMLHeadStart(fh,str,bIsFrameSet);
+	createHTMLHeadEnd(fh);
+}
+
+void createIndex(FileHandle fh)
+{                            
+	char *outputA = (char*)malloc(sizeof(char)*255);
+	DosDotFileNameZT outputB;
+	char *outputC = (char*)malloc(sizeof(char)*255);
+	char *output2 = (char*)malloc(sizeof(char)*33);
+	
+	if (!(outputA && outputC && output2))
+	{
+		free(outputA);
+		free(outputC);
+		free(output2);
+		return;
+	}
+		
+	sprintf(outputA,"<meta http-equiv=\"window-target\" content=\"_top\">\n</head>\n<frameset cols=\"21%%,*\">\n<frame src=\"LEFT.HTM\" name=\"left\">\n<frame src=\"");
+	sprintf(outputC,"\" name=\"right\">\n</frameset>\n<body>English: Your browser doesn't support frames. Hence you can't see these pages.<br>German: Sie ben&ouml;tigen einen Frame-f&auml;higen Browser, um diese Seite zu betrachten.</body>\n</html>");
+	
+	if (actphoto > 0)
+		createHTMName(photos[0].dosName, &outputB);
+	else
+	{
+		free(outputA);
+		free(outputC);
+		free(output2);
+		return;
+	}
+	
+	if (!output2)
+		return;
+	@call PhotoMainTitle::MSG_VIS_TEXT_GET_ALL_PTR(output2);
+	createHTMLHeadStart(fh,output2,TRUE);
+	free(output2);
+	FileWrite(fh,outputA,strlen(outputA),FALSE);
+	FileWrite(fh,outputB,strlen(outputB),FALSE);
+	FileWrite(fh,outputC,strlen(outputC),FALSE);
+	free(outputA);
+	free(outputC);
+}
+
+void createHTMLBodyStart(FileHandle fh)
+{
+	char *output= (char*)malloc(sizeof(char)*255);
+	if (!output)
+		return;
+	sprintf(output,"<body");
+	FileWrite(fh,output,strlen(output),FALSE);
+	if (bUseColors)
+	{
+	  if (strlen(bgcolor) == 6)
+	  {
+	    sprintf(output," bgcolor=\"%c%s\"", 35, bgcolor);
+	    FileWrite(fh,output,strlen(output),FALSE);
+	  }
+	  if (strlen(text) == 6)
+	  {
+	    sprintf(output," text=\"%c%s\"", 35, text);
+	    FileWrite(fh,output,strlen(output),FALSE);
+	  }
+	  if (strlen(link) == 6)
+	  {
+	    sprintf(output," link=\"%c%s\"", 35, link);
+	    FileWrite(fh,output,strlen(output),FALSE);
+	  }
+	  if (strlen(vlink) == 6)
+	  {
+	    sprintf(output," vlink=\"%c%s\"", 35, vlink);
+	    FileWrite(fh,output,strlen(output),FALSE);
+	  }
+	  if (strlen(alink) == 6)
+	  {
+	    sprintf(output," alink=\"%c%s\"", 35, alink);
+	    FileWrite(fh,output,strlen(output),FALSE);
+	  }
+	}
+	if (bBackground && (strlen(backgroundPath) > 0))
+	{
+	  sprintf(output," background=\"%s\"",backgroundPath);
+	  FileWrite(fh,output,strlen(output),FALSE);
+  }
+	sprintf(output,">\n");
+	FileWrite(fh,output,strlen(output),FALSE);
+	free(output);
+}
+
+void createHTMLEnd(FileHandle fh)
+{
+	char *output= (char*)malloc(sizeof(char)*255);
+	if (!output)
+		return;
+	sprintf(output,"\n<br>\n</body>\n</html>");
+	FileWrite(fh,output,strlen(output),FALSE);
+	free(output);
+}
+
+void createHR(FileHandle fh)
+{
+	char *output= (char*)malloc(sizeof(char)*255);
+	if (!output)
+		return;
+	sprintf(output,"<hr width=\"%d%%\" align=\"center\">\n",wHRWidth);
+	FileWrite(fh,output,strlen(output),FALSE);
+	free(output);
+}
+
+void createRightFile(FileHandle fh, PhotoDef in, DosDotFileNameZT linkName, Boolean bIgnoreLink)
+{                                                
+	char *convTitle = convertGeosStringToHTMLString(in.PhotoName);
+	char *output=(char*)malloc(sizeof(char)*255);
+	if (!(output && convTitle))
+	{
+		free(convTitle);
+		free(output);
+		return;
+	}
+	if (bHRAboveTitle)
+		createHR(fh);
+	sprintf(output,"<h2 align=\"center\">%s</h2>\n",convTitle);
+	FileWrite(fh,output,strlen(output),FALSE);
+	free(output);
+	if (bHRBelowTitle)
+		createHR(fh);
+	output=(char*)malloc(sizeof(char)*255);
+	if (!(output && convTitle))
+	{
+		free(convTitle);
+		free(output);
+		return;
+	}
+	if (bUseTables)
+	{
+		if (strlen(tabbgcolor) == 6)
+			sprintf(output,"<table bgcolor=\"%c%s\" border=\"%d\" align=\"center\">\n",35,tabbgcolor,nTabBoders);
+		else
+			sprintf(output,"<table border=\"%d\" align=\"center\">\n",35,nTabBoders);
+		FileWrite(fh,output,strlen(output),FALSE);
+		free(output);
+		output=(char*)malloc(sizeof(char)*255);
+		if (!output)
+		{
+			free(convTitle);
+			free(output);
+			return;
+		}
+	}
+	
+	if (bUseTables)
+	{
+		sprintf(output,"<tr><th>");
+	}
+	else
+	{
+		sprintf(output,"<p align=\"center\">");
+	}
+	FileWrite(fh,output,strlen(output),FALSE);
+	free(output);
+	output=(char*)malloc(sizeof(char)*255);
+	if (!output)
+	{
+		free(convTitle);
+		free(output);
+		return;
+	}
+	
+	if (bIgnoreLink == FALSE)
+	{
+		if ((in.height>0) && (in.width>0))
+		{
+			sprintf(output,"<a href=\"%s\" target=\"right\"><img src=\"%s\" height=\"%d\" width=\"%d\" alt=\"%s\"></a>",linkName,in.dosName,in.height,in.width,convTitle);
+		}
+		else
+		{
+			sprintf(output,"<a href=\"%s\" target=\"right\"><img src=\"%s\" alt=\"%s\"></a>",linkName,in.dosName,convTitle);
+		}
+	}
+	else
+	{
+		if ((in.height>0) && (in.width>0))
+		{
+			sprintf(output,"<img src=\"%s\" height=\"%d\" width=\"%d\" alt=\"%s\">",in.dosName,in.height,in.width,convTitle);
+		}
+		else
+		{
+			sprintf(output,"<img src=\"%s\" alt=\"%s\">",in.dosName,convTitle);
+		}
+	}
+	FileWrite(fh,output,strlen(output),FALSE);
+	free(output);
+	free(convTitle);
+	output=(char*)malloc(sizeof(char)*255);
+	if(!output)
+		return;
+	if (bUseTables)
+	{
+		if (bHRAboveComment)
+			sprintf(output,"</th></tr>\n<tr><th>");
+		else
+			sprintf(output,"</th></tr>\n");
+	}
+	else
+	{
+		sprintf(output,"</p>\n");
+	}
+	FileWrite(fh,output,strlen(output),FALSE);
+	free(output);
+	
+	if (bHRAboveComment)
+		createHR(fh);
+	
+	output=(char*)malloc(sizeof(char)*255);
+	if(!output)
+		return;
+	if (bUseTables)
+	{
+		if (bHRAboveComment)
+			sprintf(output,"</th></tr>\n<tr><th>");
+		else
+			sprintf(output,"<tr><th>");
+	}
+	else
+	{
+		sprintf(output,"<p align=\"center\">");
+	}
+	FileWrite(fh,output,strlen(output),FALSE);
+	free(output);
+	
+	FileWriteStringAsHTMLText(fh,in.PhotoComment,strlen(in.PhotoComment),FALSE);
+	
+	output=(char*)malloc(sizeof(char)*255);
+	if (!output)
+		return;
+	if (bUseTables)
+	{
+		if (bHRBelowComment)
+			sprintf(output,"</th></tr>\n<tr><th>");
+		else
+			sprintf(output,"</th></tr>\n");
+	}
+	else
+	{
+		sprintf(output,"</p>\n");
+	}
+	FileWrite(fh,output,strlen(output),FALSE);
+	free(output);
+	
+	if (bHRBelowComment)
+		createHR(fh);
+		
+	if (bUseTables)
+	{
+		output=(char*)malloc(sizeof(char)*255);
+		if (!output)
+			return;
+		if (bHRBelowComment)
+			sprintf(output,"</th></tr>\n</table>\n");
+		else
+			sprintf(output,"</table>\n");
+		FileWrite(fh,output,strlen(output),FALSE);
+		free(output);
+	}
+}
+
+int findLastDot(DosDotFileNameZT dosName)
+{
+	int nSize = strlen(dosName);
+	int i;
+	
+	for(i = nSize-1; i > 0; --i)
+	{
+		if (dosName[i] == '.')
+			break;
+	}
+	
+	return i;
+}
+
+Boolean isGIFPicture(DosDotFileNameZT dosName)
+{
+	int i = findLastDot(dosName);
+	if (i<=0)
+		return FALSE;
+
+	if((toupper(dosName[i+1]) == 'G')
+	&& (toupper(dosName[i+2]) == 'I')
+	&& (toupper(dosName[i+3]) == 'F')
+	&& (toupper(dosName[i+4]) ==  0 ))
+		return TRUE;
+	
+	return FALSE;
+}
+
+Boolean isPNGPicture(DosDotFileNameZT dosName)
+{
+	int i = findLastDot(dosName);
+	if (i<=0)
+		return FALSE;
+
+	if((toupper(dosName[i+1]) == 'P')
+	&& (toupper(dosName[i+2]) == 'N')
+	&& (toupper(dosName[i+3]) == 'G')
+	&& (toupper(dosName[i+4]) ==  0 ))
+		return TRUE;
+	
+	return FALSE;
+}
+
+Boolean isJPEGPicture(DosDotFileNameZT dosName)
+{
+	int i = findLastDot(dosName);
+	if (i<=0)
+		return FALSE;
+
+	if((toupper(dosName[i+1]) == 'J')
+	&& (toupper(dosName[i+2]) == 'P'))
+	{
+		if((toupper(dosName[i+3]) == 'G')
+		&& (toupper(dosName[i+4]) ==  0 ))
+			return TRUE;
+		if(toupper(dosName[i+3]) == 'E')
+		{
+			if(toupper(dosName[i+4]) ==  0 )
+				return TRUE;
+			if((toupper(dosName[i+4]) == 'G')
+			&& (toupper(dosName[i+5]) ==  0 ))
+				return TRUE;
+		}
+	}
+	
+	return FALSE;
+}
+
+Boolean isPicture(DosDotFileNameZT dosName)
+{
+	if (isGIFPicture(dosName))
+		return TRUE;
+	if (isJPEGPicture(dosName))
+		return TRUE;
+	if (isPNGPicture(dosName))
+		return TRUE;
+		
+	return FALSE;
+}
+
+Boolean isHTMLFile(DosDotFileNameZT dosName)
+{
+	int i = findLastDot(dosName);
+	if (i<=0)
+		return FALSE;
+
+	if((toupper(dosName[i+1]) == 'H')
+	&& (toupper(dosName[i+2]) == 'T')
+	&& (toupper(dosName[i+3]) == 'M'))
+	{
+		if(toupper(dosName[i+4]) ==  0 )
+			return TRUE;
+		if((toupper(dosName[i+4]) == 'L')
+		&& (toupper(dosName[i+5]) ==  0 ))
+			return TRUE;
+	}
+	
+	return FALSE;
+}
+
+Boolean isINDEXCSV(DosDotFileNameZT dosName)
+{
+	if (LocalCmpStringsNoCase(dosName, "INDEX.CSV", 10) == 0)
+		return TRUE;
+	return FALSE;
+}
+
+void getBitmapWidthHeight(DosDotFileNameZT dosName, int *width, int *height)
+{
+	FileHandle picture=FileOpen(dosName, (FCF_NATIVE | (FILE_ACCESS_R | FILE_DENY_RW)));
+	byte    inByte=0;/*, marker=0;*/
+	Boolean bIsGIF=FALSE;
+	Boolean bIsJPG=FALSE;
+	Boolean bIsPNG=FALSE;
+	Boolean bReadError=FALSE;
+	Boolean bPosFound=FALSE;
+	unsigned long length;
+	/*char    temp[128];*/
+
+	*height=0;
+	*width=0;
+
+	if (!picture)
+	{
+		@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("\rFile NOT FOUND: ",0);
+		@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR(dosName,0);
+		@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("\r",0);
+		FileClose(picture,FALSE);
+		return;
+	}
+
+	if (isGIFPicture(dosName))
+		bIsGIF = TRUE;
+	if (isJPEGPicture(dosName))
+		bIsJPG = TRUE;
+	if (isPNGPicture(dosName))
+		bIsPNG = TRUE;
+	
+	if (bIsGIF)
+	{
+		FilePos(picture,0x06,FILE_POS_START);
+		if (FileRead(picture,&inByte,1,FALSE))
+			*width =((int)inByte);
+		FilePos(picture,0x07,FILE_POS_START);
+		if (FileRead(picture,&inByte,1,FALSE))
+			*width+=((int)inByte)*256;
+		FilePos(picture,0x08,FILE_POS_START);
+		if (FileRead(picture,&inByte,1,FALSE))
+			*height =((int)inByte);
+		FilePos(picture,0x09,FILE_POS_START);
+		if (FileRead(picture,&inByte,1,FALSE))
+			*height+=((int)inByte)*256;
+	}
+	
+	if (bIsJPG)
+	{
+		bPosFound  = FALSE;
+		bReadError = FALSE;
+		inByte     = 0;
+		while ((!bReadError) && (!bPosFound))
+		{
+			/*find start of JPG-marker*/
+			do
+			{
+				if (!(FileRead(picture,&inByte,1,FALSE)))
+				{
+					bReadError = TRUE;
+					break;
+				}
+			} while (inByte!=0xFF);
+			if (bReadError)
+				break;
+			/*find end of JPG-marker-start*/
+			do
+			{
+				if (!(FileRead(picture,&inByte,1,FALSE)))
+				{
+					bReadError = TRUE;
+					break;
+				}
+			} while (inByte==0xFF);
+			if (bReadError)
+				break;
+			/*examine marker*/
+			if ((inByte>=0xC0)
+			 && (inByte<=0xC0 + 15)
+			 && (inByte!=0xC4)
+			 && (inByte!=0xC8)
+			 && (inByte!=0xCC))
+			{
+				bPosFound = TRUE;
+				break;
+			}
+			/*marker doesn't contain size -> skip it*/
+			if (inByte!=0xd8)
+			{
+			  /*marker = inByte; */
+				/*a) read length of marker*/
+				if (!(FileRead(picture,&inByte,1,FALSE)))
+				{
+					bReadError = TRUE;
+					break;
+				}
+				length = (unsigned long)inByte;
+				length = (length << 8);
+				if (!(FileRead(picture,&inByte,1,FALSE)))
+				{
+					bReadError = TRUE;
+					break;
+				}
+				length += (unsigned long)inByte;
+				if (length < 2)
+				  length = 2; /* Fix a bug that occurs due to JPEG-pictures containing windows-malware */
+				/*sprintf(temp,"\rSkipped JPEG-marker $%02x with length %ld ...",marker,length);*/
+				/*b) go to end of marker*/
+				length -= 2L;
+				FilePos(picture,length,FILE_POS_RELATIVE);
+				/*@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR(temp,0);*/
+			}
+		}
+		if (bPosFound && (!bReadError))
+		{
+			FilePos(picture,0x03,FILE_POS_RELATIVE);
+			if (FileRead(picture,&inByte,1,FALSE))
+				*height=inByte*256;
+			if (FileRead(picture,&inByte,1,FALSE))
+				*height+=inByte;
+			if (FileRead(picture,&inByte,1,FALSE))
+				*width=inByte*256;
+			if (FileRead(picture,&inByte,1,FALSE))
+				*width+=inByte;
+		}
+	}
+	
+	if (bIsPNG)
+	{
+		bPosFound  = FALSE;
+		bReadError = FALSE;
+		while ((!bReadError) && (!bPosFound))
+		{
+			if (!(FileRead(picture,&inByte,1,FALSE)))
+			{
+				bReadError = TRUE;
+				break;
+			}
+			if (inByte=='I')
+			{
+				if (!(FileRead(picture,&inByte,1,FALSE)))
+				{
+					bReadError = TRUE;
+					break;
+				}
+				if (inByte=='H')
+				{
+					if (!(FileRead(picture,&inByte,1,FALSE)))
+					{
+						bReadError = TRUE;
+						break;
+					}
+					if (inByte=='D')
+					{
+						if (!(FileRead(picture,&inByte,1,FALSE)))
+						{
+							bReadError = TRUE;
+							break;
+						}
+						if (inByte=='R')
+						{
+							bPosFound = TRUE;
+							break;
+						}
+					}
+				}
+			}
+		}
+		if (bPosFound && (!bReadError))
+		{
+			if (FileRead(picture,&inByte,1,FALSE))
+				*width =((int)inByte)*256*256*256;
+			if (FileRead(picture,&inByte,1,FALSE))
+				*width+=((int)inByte)*256*256;
+			if (FileRead(picture,&inByte,1,FALSE))
+				*width+=((int)inByte)*256;
+			if (FileRead(picture,&inByte,1,FALSE))
+				*width+=((int)inByte);
+			if (FileRead(picture,&inByte,1,FALSE))
+				*height =((int)inByte)*256*256*256;
+			if (FileRead(picture,&inByte,1,FALSE))
+				*height+=((int)inByte)*256*256;
+			if (FileRead(picture,&inByte,1,FALSE))
+				*height+=((int)inByte)*256;
+			if (FileRead(picture,&inByte,1,FALSE))
+				*height+=((int)inByte);
+		}
+	}
+
+	FileClose(picture,FALSE);
+}
+
+void copyPhoto(PhotoDef* source, PhotoDef* target)
+{
+	if (!(source && target))
+		return;
+	
+	strcpy(target->dosName,      source->dosName);
+	strcpy(target->PhotoName,    source->PhotoName);
+	strcpy(target->PhotoComment, source->PhotoComment);
+	target->width  = source->width;
+	target->height = source->height;
+}
+
+void readIndexCSV(void)
+{
+  FileHandle csvFile;
+  word i = 0, lengthcount = 0;
+  byte inByte;
+  Boolean bSkipFirstMark = TRUE;
+  Boolean bDosName = FALSE;
+  Boolean bPhotoName = FALSE;
+  Boolean bPhotoComment = FALSE;
+  Boolean bWidth = FALSE;
+  Boolean bHeight = FALSE;
+  Boolean bRead = FALSE;
+  
+  if (bIndexCSVFound)
+  {
+    DiskHandle       myDisk;
+	  FilePushDir();
+	  myDisk=FileSetCurrentPath(SP_DOCUMENT,"WebPhoto");
+	  if (!myDisk)
+		  FilePopDir();
+    csvFile=FileOpen("INDEX.CSV", ((FCF_NATIVE) | (FILE_ACCESS_R | FILE_DENY_RW)));
+    if ((csvFile) && ((UserStandardDialog((char *)0, (char *)0, (char *)0, (char *)0, "Do you reload old data from INDEX.CSV?", ((CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) | (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))) == IC_YES)))
+    {
+      bRead = TRUE;
+      @call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("\rLoading from INDEX.CSV...\r",0);
+      /*reset old data*/
+      for (i=0;i<actphoto;++i)
+      {
+        photos[i].dosName[0] = 0;
+        photos[i].PhotoName[0] = 0;
+        photos[i].PhotoComment[0] = 0;
+        photos[i].width = 0;
+        photos[i].height = 0;
+      }
+      /*load from index.csv*/
+      i = 0;
+      while ((FileRead(csvFile,&inByte,1,FALSE)) && (inByte>0) && (i<actphoto))
+      {
+        if (bSkipFirstMark)
+        {
+          if (inByte == 0x22)
+          {
+            bSkipFirstMark = FALSE;
+            bDosName = TRUE;
+            lengthcount = 0;
+            continue;
+          }
+          continue;
+        }
+        if (bDosName)
+        {
+          if (inByte!=0x22)
+          {
+            if (lengthcount<MYFILELENGTH)
+            {
+              photos[i].dosName[lengthcount]=inByte;
+              ++lengthcount;
+            }
+            if (lengthcount<MYFILELENGTH)
+              photos[i].dosName[lengthcount]=0;
+          }
+          else
+          {
+            if ((FileRead(csvFile,&inByte,1,FALSE)) && (inByte == ','))
+            {
+              if ((FileRead(csvFile,&inByte,1,FALSE)) && (inByte == 0x22))
+              {
+                bDosName = FALSE;
+                bPhotoName = TRUE;
+                lengthcount = 0;
+              }
+              else
+                FilePos(csvFile, -2, FILE_POS_RELATIVE);
+            }
+            else
+              FilePos(csvFile, -1, FILE_POS_RELATIVE);
+            if (bDosName != FALSE)
+            {
+              if (lengthcount<MYFILELENGTH)
+              {
+                photos[i].dosName[lengthcount]=0x22;
+                ++lengthcount;
+              }
+              if (lengthcount<MYFILELENGTH)
+                photos[i].dosName[lengthcount]=0;
+            }
+          }
+          continue;
+        }
+        if (bPhotoName)
+        {
+          if (inByte!=0x22)
+          {
+            if (lengthcount<MYFILELENGTH)
+            {
+              photos[i].PhotoName[lengthcount]=inByte;
+              ++lengthcount;
+            }
+            if (lengthcount<MYFILELENGTH)
+              photos[i].PhotoName[lengthcount]=0;
+          }
+          else
+          {
+            if ((FileRead(csvFile,&inByte,1,FALSE)) && (inByte == ','))
+            {
+              if ((FileRead(csvFile,&inByte,1,FALSE)) && (inByte == 0x22))
+              {
+                bPhotoName = FALSE;
+                bPhotoComment = TRUE;
+                lengthcount = 0;
+              }
+              else
+                FilePos(csvFile, -2, FILE_POS_RELATIVE);
+            }
+            else
+              FilePos(csvFile, -1, FILE_POS_RELATIVE);
+            if (bPhotoName != FALSE)
+            {
+              if (lengthcount<MYFILELENGTH)
+              {
+                photos[i].PhotoName[lengthcount]=0x22;
+                ++lengthcount;
+              }
+              if (lengthcount<MYFILELENGTH)
+                photos[i].PhotoName[lengthcount]=0;
+            }
+          }
+          continue;
+        }
+        if (bPhotoComment)
+        {
+          if (inByte!=0x22)
+          {
+            if (lengthcount<255)
+            {
+              photos[i].PhotoComment[lengthcount]=inByte;
+              ++lengthcount;
+            }
+            if (lengthcount<255)
+              photos[i].PhotoComment[lengthcount]=0;
+          }
+          else
+          {
+            if ((FileRead(csvFile,&inByte,1,FALSE)) && (inByte == ','))
+            {
+              if ((FileRead(csvFile,&inByte,1,FALSE)) && (inByte == 0x22))
+              {
+                bPhotoComment = FALSE;
+                bWidth = TRUE;
+                lengthcount = 0;
+              }
+              else
+                FilePos(csvFile, -2, FILE_POS_RELATIVE);
+            }
+            else
+              FilePos(csvFile, -1, FILE_POS_RELATIVE);
+            if (bPhotoComment != FALSE)
+            {
+              if (lengthcount<255)
+              {
+                photos[i].PhotoComment[lengthcount]=0x22;
+                ++lengthcount;
+              }
+              if (lengthcount<255)
+                photos[i].PhotoComment[lengthcount]=0;
+            }
+          }
+          continue;
+        }
+        if (bWidth)
+        {
+          if (inByte!=0x22)
+          {
+            photos[i].width=(photos[i].width * 10) + inByte - '0';
+          }
+          else
+          {
+            if ((FileRead(csvFile,&inByte,1,FALSE)) && (inByte == ','))
+            {
+              if ((FileRead(csvFile,&inByte,1,FALSE)) && (inByte == 0x22))
+              {
+                bWidth = FALSE;
+                bHeight = TRUE;
+                lengthcount = 0;
+              }
+              else
+                FilePos(csvFile, -2, FILE_POS_RELATIVE);
+            }
+            else
+              FilePos(csvFile, -1, FILE_POS_RELATIVE);
+          }
+          continue;
+        }
+        if (bHeight)
+        {
+          if (inByte!=0x22)
+          {
+            photos[i].height=(photos[i].height * 10) + inByte - '0';
+          }
+          else
+          {
+            if ((FileRead(csvFile,&inByte,1,FALSE)) && (inByte == 13))
+            {
+              if ((FileRead(csvFile,&inByte,1,FALSE)) && (inByte == 10))
+              {
+                bHeight = FALSE;
+                bSkipFirstMark = TRUE;
+                lengthcount = 0;
+                ++i;
+              }
+              else
+                FilePos(csvFile, -2, FILE_POS_RELATIVE);
+            }
+            else
+              FilePos(csvFile, -1, FILE_POS_RELATIVE);
+          }
+          continue;
+        }
+      }
+    }
+    if (csvFile)
+			FileClose(csvFile,FALSE);
+		FilePopDir();
+		if (bRead)
+		{
+  		if (i<actphoto)
+  		{
+  		  actphoto = i;
+    		if (actphoto>0)
+      		@call PhotoSelection::MSG_GEN_DYNAMIC_LIST_INITIALIZE(actphoto);
+      	else
+      		@call PhotoSelection::MSG_GEN_DYNAMIC_LIST_INITIALIZE(1);
+      }
+      for (i=0; i<actphoto; ++i)
+      {
+        @call PhotoSelection::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(i, photos[i].dosName);
+      }
+    }
+  }
+}
+
+void readPhotos(void)
+{
+	DiskHandle       myDisk;
+	FileEnumParams   FE_params;
+	FileExtAttrDesc  FE_returnAttrs[2];
+	MemHandle        FE_buffer;
+	word             FE_numExtra, resSize, i, picTotal;
+	DosDotFileNameZT *erg;
+	
+	FilePushDir();
+	myDisk=FileSetCurrentPath(SP_DOCUMENT,"WebPhoto");
+	if (!myDisk)
+	{
+		FilePopDir();
+		@call PhotoStatusText::MSG_VIS_TEXT_DELETE_ALL();
+		@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("Directory or drive not found: DOCUMENT\\WebPhoto !",0);
+		return;
+	}
+	FE_returnAttrs[0].FEAD_attr  = FEA_DOS_NAME;
+	FE_returnAttrs[0].FEAD_value = 0;
+	FE_returnAttrs[0].FEAD_size  = MYFILELENGTH;
+	FE_returnAttrs[0].FEAD_name  = 0;
+	FE_returnAttrs[1].FEAD_attr  = FEA_END_OF_LIST;
+	FE_returnAttrs[1].FEAD_value = 0;
+	FE_returnAttrs[1].FEAD_size  = 0;
+	FE_returnAttrs[1].FEAD_name  = 0;
+	FE_params.FEP_searchFlags    = FESF_NON_GEOS;
+	FE_params.FEP_matchAttrs     = 0;
+	FE_params.FEP_returnAttrs    = &FE_returnAttrs[0];
+	FE_params.FEP_returnSize     = MYFILELENGTH;
+	FE_params.FEP_bufSize        = FE_BUFSIZE_UNLIMITED;
+	FE_params.FEP_skipCount      = 0;
+	FE_params.FEP_callback       = 0;
+	FE_params.FEP_callbackAttrs  = 0;
+	FE_params.FEP_cbData1        = 0;
+	FE_params.FEP_cbData2        = 0;
+	FE_params.FEP_headerSize     = 0;
+	FE_buffer                    = 0;
+	FE_numExtra               	 = 0;
+	photos  					 					 = 0;
+	actphoto					 					 = 0;
+	bIndexCSVFound 							 = FALSE;
+	resSize=FileEnum( &FE_params, &FE_buffer, &FE_numExtra );
+
+	picTotal = 0;
+	if (resSize>0)
+	{
+		erg = (DosDotFileNameZT* )MemLock( FE_buffer );
+		if (!erg)
+			return;
+		
+		photos=(PhotoDef*)malloc(sizeof(PhotoDef)*1);
+		if (!photos)
+		{
+			FilePopDir();
+			MemUnlock( FE_buffer );
+			MemFree( FE_buffer );
+			@call PhotoStatusText::MSG_VIS_TEXT_DELETE_ALL();
+			@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("Out of memory!?!",0);
+			return;
+		}	
+		for (i=0;i<resSize;++i)
+		{
+			if (isPicture(erg[i]))
+			{
+				picTotal++;
+				if (picTotal > 1)
+				{
+					photos=(PhotoDef*)realloc(photos, sizeof(PhotoDef)*picTotal);
+					if (!photos)
+					{
+						FilePopDir();
+						MemUnlock( FE_buffer );
+						MemFree( FE_buffer );
+						@call PhotoStatusText::MSG_VIS_TEXT_DELETE_ALL();
+						@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("Out of memory!?!",0);
+						return;
+					}
+				}
+			}
+		}
+		if (picTotal < 1)
+		{
+			free(photos);
+			photos = NULL;
+		}
+		if (!photos)
+		{
+			FilePopDir();
+			MemUnlock( FE_buffer );
+			MemFree( FE_buffer );
+			@call PhotoStatusText::MSG_VIS_TEXT_DELETE_ALL();
+			@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("Out of memory or no files found!?!",0);
+			return;
+		}
+		@call PhotoStatusText::MSG_VIS_TEXT_DELETE_ALL();
+		@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("Files found:\r",0);
+		@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("============\r",0);
+		for (i=0;i<resSize;++i)
+		{ 
+			if (isHTMLFile(erg[i]))
+		  {
+				++numHTM;
+				continue;
+			}
+			
+			if (!bIndexCSVFound)
+			{
+				bIndexCSVFound=isINDEXCSV(erg[i]);
+				if (bIndexCSVFound)
+					continue;
+			}
+			
+			if (!(isPicture(erg[i])))
+				continue;
+			
+			@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR(erg[i],0);
+			sprintf(photos[actphoto].dosName, erg[i]);
+			sprintf(photos[actphoto].PhotoName, erg[i]);
+			sprintf(photos[actphoto].PhotoComment, "Comment for %s", erg[i]);
+			getBitmapWidthHeight(photos[actphoto].dosName,&(photos[actphoto].width),&(photos[actphoto].height));
+			@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR(" \r",0);
+			++actphoto;
+		}
+		MemUnlock( FE_buffer );
+		MemFree( FE_buffer );
+	}
+	else
+	{
+		@call PhotoStatusText::MSG_VIS_TEXT_DELETE_ALL();
+		@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("None found",0);
+	}
+	FilePopDir();
+	if (actphoto>0)
+		@call PhotoSelection::MSG_GEN_DYNAMIC_LIST_INITIALIZE(actphoto);
+	else
+		@call PhotoSelection::MSG_GEN_DYNAMIC_LIST_INITIALIZE(1);
+}
+
+/*get the settings and the latest entered text for the actual photo before writing */
+void preWritePhotos(void)
+{
+	word wSelectedListType = 0;
+	
+	bCreateAllPicsPage  = @call PhotoAllBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(1);
+	bHRAboveAllPicsLink = @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(1);
+	bHRBelowAllPicsLink = @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(2);
+	bHRAboveTitle       = @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(4);
+	bHRBelowTitle       = @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(8);
+	bHRAboveComment     = @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(16);
+	bHRBelowComment     = @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(32);
+	bHROnAllPicsPage    = @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(64);
+	wHRWidth            = @call PhotoOptionsHRWidth::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+	wSelectedListType   = @call PhotoListOptions::MSG_GEN_ITEM_GROUP_GET_SELECTION();
+	bUseColors          = @call PhotoBodyBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(1);
+	bBackground         = @call PhotoBodyBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(2);
+	bUseTables			= @call PhotoBodyBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(4);
+	bUnorderedList      = FALSE;
+	bOrderedList        = FALSE;
+	bOrderedLista       = FALSE; 
+	bOrderedListA       = FALSE; 
+	bOrderedListi       = FALSE; 
+	bOrderedListI       = FALSE; 
+	bNoList             = FALSE;
+	
+	bRobotsAll			= @call PhotoRobotBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(1);
+	bRobotsIndex		= @call PhotoRobotBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(2);
+	bRobotsFollow		= @call PhotoRobotBoolOptions::MSG_GEN_BOOLEAN_GROUP_IS_BOOLEAN_SELECTED(4);
+	
+	switch (wSelectedListType)
+	{
+		case 1 : bUnorderedList = TRUE; break;
+		case 2 : bOrderedList   = TRUE; break;
+		case 4 : bOrderedLista  = TRUE; break;
+		case 8 : bOrderedListA  = TRUE; break;
+		case 16: bOrderedListi  = TRUE; break;
+		case 32: bOrderedListI  = TRUE; break;
+		case 64: bNoList        = TRUE; break;
+		default: bNoList        = TRUE; break;
+	}
+	
+	/*read old stuff!!!!*/
+	if ((bFirst==FALSE) && (actselection<actphoto))
+	{
+		@call PhotoTitle::MSG_VIS_TEXT_GET_ALL_PTR(photos[actselection].PhotoName);
+		@call PhotoComment::MSG_VIS_TEXT_GET_ALL_PTR(photos[actselection].PhotoComment);
+	}
+}
+
+void writePhotos(void)
+{
+	DiskHandle       myDisk;
+	FileHandle       leftFile, rightFile, indexFile, csvFile;
+	word             i; /* counter, i;*/
+	DosDotFileNameZT tempName;
+	DosDotFileNameZT linkName;
+	char            *line=0;
+	char 						*output=0;
+	char             listTypeStart[16];
+	char             listTypeEnd[16];
+	char             listCont[16];
+	
+	listTypeStart[0]=0;
+	listTypeEnd[0]=0;
+	listCont[0]=0;
+
+	if (bUnorderedList)
+	{
+		sprintf(listTypeStart, "<ul>");
+		sprintf(listTypeEnd,   "</ul>");
+	}
+	else
+	{
+		if (!bNoList)
+			sprintf(listCont, " value=\"%d\"", actphoto+1);
+	}
+	if (bOrderedList)
+	{
+		sprintf(listTypeStart, "<ol>");
+		sprintf(listTypeEnd,   "</ol>");
+	}
+	if (bOrderedLista)
+	{
+		sprintf(listTypeStart, "<ol type=\"a\">");
+		sprintf(listTypeEnd,   "</ol>");
+	}
+	if (bOrderedListA)
+	{
+		sprintf(listTypeStart, "<ol type=\"A\">");
+		sprintf(listTypeEnd,   "</ol>");
+	}
+	if (bOrderedListi)
+	{
+		sprintf(listTypeStart, "<ol type=\"i\">");
+		sprintf(listTypeEnd,   "</ol>");
+	}
+	if (bOrderedListI)
+	{
+		sprintf(listTypeStart, "<ol type=\"I\">");
+		sprintf(listTypeEnd,   "</ol>");
+	}
+
+	FilePushDir();
+	myDisk=FileSetCurrentPath(SP_DOCUMENT,"WebPhoto");
+	if (!myDisk)
+	{
+		FilePopDir();
+		@call PhotoStatusText::MSG_VIS_TEXT_DELETE_ALL();
+		@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("Directory or drive not found!",0);
+		return;
+	}
+	if (actphoto > 0)
+	{
+		csvFile=FileCreate("INDEX.CSV", ((FCF_NATIVE | FILE_CREATE_TRUNCATE) | (FILE_ACCESS_RW | FILE_DENY_RW)),0);
+		if (csvFile)
+		{
+			createCSVFile(csvFile);
+			FileClose(csvFile,FALSE);
+		}
+		else
+			@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("\rError while creating INDEX.CSV!?!",0);
+		indexFile=FileCreate("INDEX.HTM", ((FCF_NATIVE | FILE_CREATE_TRUNCATE) | (FILE_ACCESS_RW | FILE_DENY_RW)),0);
+		if (indexFile)
+		{
+			createIndex(indexFile);
+			FileClose(indexFile,FALSE);
+		}
+		else
+			@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("\rError while creating INDEX.HTM!?!",0);
+		leftFile=FileCreate("LEFT.HTM", ((FCF_NATIVE | FILE_CREATE_TRUNCATE) | (FILE_ACCESS_RW | FILE_DENY_RW)),0);
+		if (leftFile)
+		{
+			createHTMLHead(leftFile,"Left Frame",FALSE);
+			createHTMLBodyStart(leftFile);
+			output=(char*)malloc(sizeof(char)*255);
+			if (output)
+			{
+				sprintf(output,"<p align=\"center\">%s\n",listTypeStart);
+				FileWrite(leftFile,output,strlen(output),FALSE);
+			}
+			free(output); output = 0;
+			for (i=0;i<actphoto;++i)
+			{
+				createHTMName(photos[i].dosName, &tempName);
+				if (i<actphoto-1)
+					createHTMName(photos[i+1].dosName, &linkName);
+				else
+					createHTMName(photos[0].dosName, &linkName);
+				line=createLinkLine(photos[i].PhotoName, tempName);
+				if (line)
+					FileWrite(leftFile,line,strlen(line),FALSE);
+				free(line); line=NULL;
+				rightFile=FileCreate(tempName, ((FCF_NATIVE | FILE_CREATE_TRUNCATE) | (FILE_ACCESS_RW | FILE_DENY_RW)),0);
+				if (rightFile)
+				{
+					createHTMLHead(rightFile,photos[i].PhotoName,FALSE);
+					createHTMLBodyStart(rightFile);
+					createRightFile(rightFile,photos[i],linkName,FALSE);
+					createHTMLEnd(rightFile);
+					FileClose(rightFile,FALSE);
+				}
+				else
+				{
+					output=(char*)malloc(sizeof(char)*255);
+					if (output)
+					{
+						sprintf(output,"\rError while creating %s!?!", tempName);
+						@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR(output,0);
+					}
+					else
+						@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("\rError while creating some HTM-file and while allocating output!?!?!",0);
+					free(output); output = 0;
+				}
+			}
+			if (bCreateAllPicsPage)
+			{
+				if (bHRAboveAllPicsLink)
+				{
+					output=(char*)malloc(sizeof(char)*255);
+					if (output)
+					{
+						sprintf(output,"%s</p>\n", listTypeEnd);
+						FileWrite(leftFile,output,strlen(output),FALSE);
+					}
+					free(output); output = 0;
+					createHR(leftFile);
+				}
+				output=(char*)malloc(sizeof(char)*255);
+				if (output)
+				{
+					if (bNoList)
+					{
+						if (bHRAboveAllPicsLink) 
+							sprintf(output,"<p align=\"center\">\n<a href=\"ALL.HTM\" target=\"right\">All pictures</a>\n");
+						else
+							sprintf(output,"</p>\n<p align=\"center\">\n<a href=\"ALL.HTM\" target=\"right\">All pictures</a>\n");
+					}
+					else
+					{
+						if (bHRAboveAllPicsLink) 
+							sprintf(output,"<p align=\"center\">%s\n<li%s><a href=\"ALL.HTM\" target=\"right\">All pictures</a></li>\n", listTypeStart, listCont);
+						else
+							sprintf(output,"%s</p>\n<p align=\"center\">%s\n<li%s><a href=\"ALL.HTM\" target=\"right\">All pictures</a></li>\n", listTypeEnd, listTypeStart, listCont);
+					}
+					FileWrite(leftFile,output,strlen(output),FALSE);
+				}
+				free(output); output = 0;
+				rightFile=FileCreate("ALL.HTM", ((FCF_NATIVE | FILE_CREATE_TRUNCATE) | (FILE_ACCESS_RW | FILE_DENY_RW)),0);
+				if (rightFile)
+				{
+					createHTMLHead(rightFile,"All pictures",FALSE);
+					createHTMLBodyStart(rightFile);
+					for (i=0;i<actphoto;++i)
+					{
+						createRightFile(rightFile,photos[i],"",TRUE);
+						if (bHROnAllPicsPage)
+						  createHR(rightFile);
+					}
+					createHTMLEnd(rightFile);
+					FileClose(rightFile,FALSE);
+				}
+				else
+					@call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("\rError while creating ALL.HTM!?!",0);
+				if (bHRBelowAllPicsLink)
+				{
+					output=(char*)malloc(sizeof(char)*255);
+					if (output)
+					{
+						sprintf(output,"%s</p>\n", listTypeEnd);
+						FileWrite(leftFile,output,strlen(output),FALSE);
+					}
+					free(output); output = 0;
+					createHR(leftFile);
+				}
+			}
+			if ((!bHRBelowAllPicsLink) || (!bCreateAllPicsPage))
+			{
+				output=(char*)malloc(sizeof(char)*255);
+				if (output)
+				{
+					sprintf(output,"%s</p>\n", listTypeEnd);
+					FileWrite(leftFile,output,strlen(output),FALSE);
+				}
+				free(output); output = 0;
+			}
+			createHTMLEnd(leftFile);
+			FileClose(leftFile,FALSE);
+		}
+    else
+      @call PhotoStatusText::MSG_VIS_TEXT_APPEND_PTR("\rError while creating LEFT.HTM!?!",0);
+  }
+  FilePopDir();
+}
+
+/*              
+ ***************************************************************************
+ * MESSAGES
+ ***************************************************************************
+ */
+ 
+@method PhotoProcessClass, MSG_GDLP_LIST_MONIKER_QUERY
+{
+  if (item<actphoto)
+    @call PhotoSelection::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item, photos[item].dosName);
+  else
+    @call PhotoSelection::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(item,"Error! :-(");
+}
+
+@method PhotoProcessClass, MSG_GDLP_LIST_APPLY
+{
+  /*read old stuff!!!!*/
+  if ((bFirst==FALSE) && (actselection<actphoto))
+  {
+    @call PhotoTitle::MSG_VIS_TEXT_GET_ALL_PTR(photos[actselection].PhotoName);
+    @call PhotoComment::MSG_VIS_TEXT_GET_ALL_PTR(photos[actselection].PhotoComment);
+  }
+  
+  @call PhotoName::MSG_VIS_TEXT_DELETE_ALL();
+  @call PhotoTitle::MSG_VIS_TEXT_DELETE_ALL();
+  @call PhotoComment::MSG_VIS_TEXT_DELETE_ALL();
+  
+  if ((selection>=actphoto) || (numSelections!=1))
+  {
+    @call PhotoName::MSG_VIS_TEXT_APPEND_PTR("Error",0);
+    @call PhotoTitle::MSG_VIS_TEXT_APPEND_PTR("Error",0);
+    @call PhotoComment::MSG_VIS_TEXT_APPEND_PTR("Error",0);
+  }
+  if (selection<actphoto)
+  {
+    @call PhotoName::MSG_VIS_TEXT_APPEND_PTR(photos[selection].dosName,0);
+    @call PhotoTitle::MSG_VIS_TEXT_APPEND_PTR(photos[selection].PhotoName,0);
+    @call PhotoComment::MSG_VIS_TEXT_APPEND_PTR(photos[selection].PhotoComment,0);
+    bFirst=FALSE;
+    actselection=selection;
+  }
+}
+
+@method PhotoProcessClass, MSG_GEN_PROCESS_OPEN_APPLICATION
+{
+  char strTitle[33];
+  word dataSize = 33;
+  photos=0;
+  actphoto=0;
+  actselection=0;
+  bFirst=TRUE;
+  numHTM=0;
+  bOverwrite=TRUE;
+  bCreateAllPicsPage=FALSE;
+  bHRAboveAllPicsLink=FALSE;
+  bHRBelowAllPicsLink=FALSE;
+  bHRAboveTitle=FALSE;
+  bHRBelowTitle=FALSE;
+  bHRAboveComment=FALSE;
+  bHRBelowComment=FALSE;
+  bHROnAllPicsPage=FALSE;
+  wHRWidth=80;
+  bUnorderedList=TRUE;
+  bOrderedList=FALSE;
+  bOrderedLista=FALSE;
+  bOrderedListA=FALSE;
+  bOrderedListi=FALSE;
+  bOrderedListI=FALSE;
+  bNoList=FALSE;
+  
+  @callsuper();
+  @call PhotoApp::MSG_GEN_APPLICATION_INSTALL_TOKEN();
+  InitFileReadBoolean("WebPhoto","CreateAllPicsPage",&bCreateAllPicsPage);
+  InitFileReadBoolean("WebPhoto","HRAboveAllPicsLink",&bHRAboveAllPicsLink);
+  InitFileReadBoolean("WebPhoto","HRBelowAllPicsLink",&bHRBelowAllPicsLink);
+  InitFileReadBoolean("WebPhoto","HRAboveTitle",&bHRAboveTitle);
+  InitFileReadBoolean("WebPhoto","HRBelowTitle",&bHRBelowTitle);
+  InitFileReadBoolean("WebPhoto","HRAboveComment",&bHRAboveComment);
+  InitFileReadBoolean("WebPhoto","HRBelowComment",&bHRBelowComment);
+  InitFileReadBoolean("WebPhoto","HROnAllPicsPage",&bHROnAllPicsPage);
+  InitFileReadInteger("WebPhoto","HRWidth",&wHRWidth);
+  InitFileReadBoolean("WebPhoto","UnorderedList",&bUnorderedList);
+  InitFileReadBoolean("WebPhoto","OrderedList",&bOrderedList);  
+  InitFileReadBoolean("WebPhoto","OrderedListALow",&bOrderedLista);
+  InitFileReadBoolean("WebPhoto","OrderedListA",&bOrderedListA); 
+  InitFileReadBoolean("WebPhoto","OrderedListILow",&bOrderedListi); 
+  InitFileReadBoolean("WebPhoto","OrderedListI",&bOrderedListI);
+  InitFileReadBoolean("WebPhoto","NoList",&bNoList);
+  InitFileReadBoolean("WebPhoto","RobotsAll",&bRobotsAll);
+  InitFileReadBoolean("WebPhoto","RobotsIndex",&bRobotsIndex);
+  InitFileReadBoolean("WebPhoto","RobotsFollow",&bRobotsFollow);
+  InitFileReadBoolean("WebPhoto","Tables",&bUseTables);
+  InitFileReadInteger("WebPhoto","Border",&nTabBoders);
+  
+  @call PhotoRobotBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1,bRobotsAll);
+  @call PhotoRobotBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(2,bRobotsIndex);
+  @call PhotoRobotBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(4,bRobotsFollow);
+  @call PhotoAllBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1,bCreateAllPicsPage);
+  @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1,bHRAboveAllPicsLink);
+  @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(2,bHRBelowAllPicsLink);
+  @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(4,bHRAboveTitle);
+  @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(8,bHRBelowTitle);
+  @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(16,bHRAboveComment);
+  @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(32,bHRBelowComment);
+  @call PhotoHRBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(64,bHROnAllPicsPage);
+  @call PhotoOptionsHRWidth::MSG_GEN_VALUE_SET_INTEGER_VALUE(wHRWidth,FALSE);
+  @call PhotoListOptions::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(1,FALSE);
+  if (bUnorderedList)
+    @call PhotoListOptions::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(1,FALSE);
+  if (bOrderedList)
+    @call PhotoListOptions::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(2,FALSE);
+  if (bOrderedLista)
+    @call PhotoListOptions::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(4,FALSE);
+  if (bOrderedListA)
+    @call PhotoListOptions::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(8,FALSE);
+  if (bOrderedListi)
+    @call PhotoListOptions::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(16,FALSE);
+  if (bOrderedListI)
+    @call PhotoListOptions::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(32,FALSE);
+  if (bNoList)
+    @call PhotoListOptions::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(64,FALSE);
+  InitFileReadStringBuffer("WebPhoto","LastTitle",strTitle,IFRF_SIZE | 33,&dataSize);
+  if ((strlen(strTitle) > 0) && (dataSize > 0))
+  {
+    @call PhotoMainTitle::MSG_VIS_TEXT_DELETE_ALL();
+    @call PhotoMainTitle::MSG_VIS_TEXT_APPEND_PTR(strTitle,0);
+  }
+
+  InitFileReadBoolean("WebPhoto","UseColors",&bUseColors);
+  dataSize = 7;
+  InitFileReadStringBuffer("WebPhoto","bgcolor",bgcolor, IFRF_SIZE | 7,&dataSize);
+  InitFileReadStringBuffer("WebPhoto","text"   ,text,    IFRF_SIZE | 7,&dataSize);
+  InitFileReadStringBuffer("WebPhoto","link"   ,link,    IFRF_SIZE | 7,&dataSize);
+  InitFileReadStringBuffer("WebPhoto","vlink"  ,vlink,   IFRF_SIZE | 7,&dataSize);
+  InitFileReadStringBuffer("WebPhoto","alink"  ,alink,   IFRF_SIZE | 7,&dataSize);
+  InitFileReadStringBuffer("WebPhoto","TableBGColor",tabbgcolor,IFRF_SIZE | 7,&dataSize);
+  InitFileReadBoolean("WebPhoto","Background",&bBackground);
+  dataSize = 255;
+  InitFileReadStringBuffer("WebPhoto","BackgroundPath",backgroundPath, IFRF_SIZE | 255,&dataSize);
+  
+  @call PhotoBodyBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(1, bUseColors);
+  @call PhotoBodyBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(2, bBackground);
+  @call PhotoBodyBoolOptions::MSG_GEN_BOOLEAN_GROUP_SET_BOOLEAN_STATE(4, bUseTables);
+  
+  @call PhotoTableBGColor::MSG_VIS_TEXT_DELETE_ALL();
+  @call PhotoTableBGColor::MSG_VIS_TEXT_APPEND_PTR(tabbgcolor,0);
+  @call PhotoTableBorderSize::MSG_GEN_VALUE_SET_INTEGER_VALUE(nTabBoders,FALSE);
+  
+  readPhotos();
+  if (numHTM>0)
+  {
+    if (UserDoDialog(@PhotoOverwrite) != IC_YES)
+    {
+      @call PhotoSelection::MSG_GEN_DYNAMIC_LIST_REMOVE_ITEMS(0,actphoto);
+      @call PhotoStatusText::MSG_VIS_TEXT_DELETE_ALL();
+      @call PhotoName::MSG_VIS_TEXT_DELETE_ALL();
+      @call PhotoTitle::MSG_VIS_TEXT_DELETE_ALL();
+      @call PhotoComment::MSG_VIS_TEXT_DELETE_ALL();
+      @call PhotoMainTitle::MSG_VIS_TEXT_DELETE_ALL();
+      bOverwrite=FALSE;
+      free(photos);
+      photos=0;
+      actphoto=0;
+      actselection=-1;
+      @send, forceQueue self::MSG_PHOTO_EXIT();
+      return;
+    }
+  }
+  readIndexCSV();
+}
+
+@method PhotoProcessClass, MSG_GEN_PROCESS_CLOSE_APPLICATION
+{
+  char strTitle[33];
+  @call PhotoMainTitle::MSG_VIS_TEXT_GET_ALL_PTR(strTitle);
+  if (bOverwrite==TRUE)
+  { 
+    preWritePhotos();
+    writePhotos();
+    free(photos);
+    photos=0;
+    InitFileWriteBoolean("WebPhoto","CreateAllPicsPage",bCreateAllPicsPage);
+    InitFileWriteBoolean("WebPhoto","HRAboveAllPicsLink",bHRAboveAllPicsLink);
+    InitFileWriteBoolean("WebPhoto","HRBelowAllPicsLink",bHRBelowAllPicsLink);
+    InitFileWriteBoolean("WebPhoto","HRAboveTitle",bHRAboveTitle);
+    InitFileWriteBoolean("WebPhoto","HRBelowTitle",bHRBelowTitle);
+    InitFileWriteBoolean("WebPhoto","HRAboveComment",bHRAboveComment);
+    InitFileWriteBoolean("WebPhoto","HRBelowComment",bHRBelowComment);
+    InitFileWriteBoolean("WebPhoto","HROnAllPicsPage",bHROnAllPicsPage);
+    InitFileWriteInteger("WebPhoto","HRWidth",wHRWidth);
+    InitFileWriteBoolean("WebPhoto","UnorderedList",bUnorderedList);
+    InitFileWriteBoolean("WebPhoto","OrderedList",bOrderedList);
+    InitFileWriteBoolean("WebPhoto","OrderedListALow",bOrderedLista);
+    InitFileWriteBoolean("WebPhoto","OrderedListA",bOrderedListA);
+    InitFileWriteBoolean("WebPhoto","OrderedListILow",bOrderedListi);
+    InitFileWriteBoolean("WebPhoto","OrderedListI",bOrderedListI);
+    InitFileWriteBoolean("WebPhoto","NoList",bNoList);
+    InitFileWriteString ("WebPhoto","LastTitle",strTitle);
+    InitFileWriteBoolean("WebPhoto","UseColors",bUseColors);
+    InitFileWriteString ("WebPhoto","bgcolor",bgcolor);
+    InitFileWriteString ("WebPhoto","text",text);
+    InitFileWriteString ("WebPhoto","link",link);
+    InitFileWriteString ("WebPhoto","vlink",vlink);
+    InitFileWriteString ("WebPhoto","alink",alink);
+    InitFileWriteBoolean("WebPhoto","Background",bBackground);
+    InitFileWriteString ("WebPhoto","BackgroundPath",backgroundPath);
+    InitFileWriteBoolean("WebPhoto","RobotsAll",bRobotsAll);
+    InitFileWriteBoolean("WebPhoto","RobotsIndex",bRobotsIndex);
+    InitFileWriteBoolean("WebPhoto","RobotsFollow",bRobotsFollow);
+	InitFileWriteBoolean("WebPhoto","Tables",bUseTables);
+	InitFileWriteInteger("WebPhoto","Border",nTabBoders);
+	InitFileWriteString ("WebPhoto","TableBGColor",tabbgcolor);
+    InitFileCommit();
+  }
+  actphoto=0;
+  actselection=-1;
+  return(@callsuper());
+}
+
+@method PhotoProcessClass, MSG_PHOTO_UP
+{
+  if ((bFirst==FALSE) && (actselection<actphoto) && (actselection>0))
+  {
+    PhotoDef temp;
+    copyPhoto(&photos[actselection-1], &temp);
+    copyPhoto(&photos[actselection]  , &photos[actselection-1]);
+    copyPhoto(&temp				     , &photos[actselection]);
+    
+    @call PhotoSelection::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(actselection-1, photos[actselection-1].dosName);
+    @call PhotoSelection::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(actselection, photos[actselection].dosName);
+    @call PhotoSelection::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(actselection-1, FALSE);
+    --actselection;
+  }
+}
+
+@method PhotoProcessClass, MSG_PHOTO_DOWN
+{
+  if ((bFirst==FALSE) && (actselection<actphoto-1))
+  {
+    PhotoDef temp;
+    copyPhoto(&photos[actselection+1], &temp);
+    copyPhoto(&photos[actselection]  , &photos[actselection+1]);
+    copyPhoto(&temp				     , &photos[actselection]);
+    
+    @call PhotoSelection::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(actselection+1, photos[actselection+1].dosName);
+    @call PhotoSelection::MSG_GEN_DYNAMIC_LIST_REPLACE_ITEM_TEXT(actselection, photos[actselection].dosName);
+    @call PhotoSelection::MSG_GEN_ITEM_GROUP_SET_SINGLE_SELECTION(actselection+1, FALSE);
+    ++actselection;
+  }
+}
+
+@method PhotoProcessClass, MSG_PHOTO_EXIT
+{
+  @send, forceQueue application::MSG_META_QUIT();
+}
+
+@method PhotoProcessClass, MSG_CLEAR_ALL_COMMENTS
+{
+  int i;
+  
+  if ((UserStandardDialog((char *)0, (char *)0, (char *)0, (char *)0, "Do you really want to delete the comments?", ((CDT_QUESTION << CDBF_DIALOG_TYPE_OFFSET) | (GIT_AFFIRMATION << CDBF_INTERACTION_TYPE_OFFSET))) == IC_YES))
+  {
+    @send, forceQueue PhotoComment::MSG_VIS_TEXT_DELETE_ALL();
+    if (photos)
+    {
+    for (i=0;i<actphoto;++i)
+    {
+      photos[i].PhotoComment[0] = '\0';
+    }
+    }
+  }
+}
+
+@method PhotoProcessClass, MSG_PHOTO_SAVE
+{
+  preWritePhotos();
+  writePhotos();
+}
+
+@method PhotoProcessClass, MSG_CHANGE_COLOURS
+{
+  @call PhotoBGColorText::MSG_VIS_TEXT_DELETE_ALL();
+  @call PhotoTextText   ::MSG_VIS_TEXT_DELETE_ALL();
+  @call PhotoLinkText   ::MSG_VIS_TEXT_DELETE_ALL();
+  @call PhotoVLinkText  ::MSG_VIS_TEXT_DELETE_ALL();
+  @call PhotoALinkText  ::MSG_VIS_TEXT_DELETE_ALL();
+  @call PhotoBGColorText::MSG_VIS_TEXT_APPEND_PTR(bgcolor ,0);
+  @call PhotoTextText   ::MSG_VIS_TEXT_APPEND_PTR(text    ,0);
+  @call PhotoLinkText   ::MSG_VIS_TEXT_APPEND_PTR(link    ,0);
+  @call PhotoVLinkText  ::MSG_VIS_TEXT_APPEND_PTR(vlink   ,0);
+  @call PhotoALinkText  ::MSG_VIS_TEXT_APPEND_PTR(alink   ,0);
+  if (UserDoDialog(@PhotoColourDialog) == IC_YES)
+  {
+    /*then get colours from dialog*/
+    @call PhotoBGColorText::MSG_VIS_TEXT_GET_ALL_PTR(bgcolor);
+    @call PhotoTextText   ::MSG_VIS_TEXT_GET_ALL_PTR(text   );
+    @call PhotoLinkText   ::MSG_VIS_TEXT_GET_ALL_PTR(link   );
+    @call PhotoVLinkText  ::MSG_VIS_TEXT_GET_ALL_PTR(vlink  );
+    @call PhotoALinkText  ::MSG_VIS_TEXT_GET_ALL_PTR(alink  );
+  }
+}
+
+@method PhotoProcessClass, MSG_SHOW_TABLEOPTIONS
+{
+  @call PhotoTableBGColor::MSG_VIS_TEXT_DELETE_ALL();
+  @call PhotoTableBGColor::MSG_VIS_TEXT_APPEND_PTR(tabbgcolor,0);
+  @call PhotoTableBorderSize::MSG_GEN_VALUE_SET_INTEGER_VALUE(nTabBoders,FALSE);
+  if (UserDoDialog(@PhotoTableOptionsDialog) == IC_YES)
+  {
+    /*then get background-colour and border-size from dialog*/
+    @call PhotoTableBGColor::MSG_VIS_TEXT_GET_ALL_PTR(tabbgcolor);
+	nTabBoders = @call PhotoTableBorderSize::MSG_GEN_VALUE_GET_INTEGER_VALUE();
+  }
+}
+
+@method PhotoProcessClass, MSG_CHANGE_BACKGROUND
+{
+  @call PhotoBackPath::MSG_VIS_TEXT_DELETE_ALL();
+  @call PhotoBackPath::MSG_VIS_TEXT_APPEND_PTR(backgroundPath,0);
+  if (UserDoDialog(@PhotoBackDialog) == IC_YES)
+  {
+    /*then get background-path from dialog*/
+    @call PhotoBackPath::MSG_VIS_TEXT_GET_ALL_PTR(backgroundPath);
+  }
+}
+
+@method PhotoProcessClass, MSG_CHANGE_HRWIDTH
+{
+  UserDoDialog(@PhotoOptionsHRWidthDialog);
+}
+
+@method PhotoProcessClass, MSG_PHOTO_ABOUT
+{
+  UserDoDialog(@PhotoAboutDialog);
+}

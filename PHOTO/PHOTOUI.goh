@@ -1,0 +1,709 @@
+/***********************************************************************
+ * MODULE: photo
+ * FILE:   UI.goh
+ *
+ ***********************************************************************
+ *
+ * WebPhotos
+ * Copyright (C) 2000-2012 Jörg Polzfuß
+ *
+ * This program is free software since 2004; you can redistribute it and/or modify
+ * it under the terms of version 2 of the GNU General Public License as
+ * published by the Free Software Foundation. EXCEPTION: This doesn't
+ * include my programer's ID (16457) as used for the tokenid in the
+ * .gp-file! Please use your own ID or the MANUFACTURER_ID_SDK (8)
+ * or MANUFACTURER_ID_SHAREWARE (9) instead!
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+ *
+ ***********************************************************************/
+
+@start  Interface;    /* this resource is for misc UI objects */
+
+@object GenPrimaryClass PhotoPrimary  = {
+  GI_comp = @PhotoMainTitleText,
+            @PhotoMainTitle,
+            @PhotoMainUI,
+            @PhotoStatusTextText,
+            @PhotoStatusText,
+            @PhotoOverwrite,
+            @PhotoFileMenu,
+            @PhotoEditGroup,
+            @PhotoOptions,
+            @PhotoOptionsHRWidthDialog,
+			@PhotoTableOptionsDialog,
+            @PhotoColourDialog,
+            @PhotoBackDialog,
+            @PhotoAboutMenu,
+            @PhotoAboutDialog;
+  HINT_SIZE_WINDOW_AS_DESIRED;
+  HINT_ORIENT_CHILDREN_VERTICALLY;
+  ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+@object GenGlyphClass PhotoMainTitleText = {
+  GI_visMoniker = "Frameset: General Title:";
+}
+
+@object GenGlyphClass @PhotoStatusTextText = {
+  GI_visMoniker = "Status (Read Only):";
+}
+
+@object GenTextClass PhotoMainTitle = {
+  GI_attrs = @default | GA_TARGETABLE;
+  GTXI_attrs = (GTA_USE_TAB_FOR_NAVIGATION | GTA_NO_WORD_WRAPPING) | ( GTA_SINGLE_LINE_TEXT );
+  GTXI_text = "General Title";
+  GTXI_maxLength = 32;
+  HINT_TEXT_FRAME;
+  HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+  HINT_TEXT_WHITE_WASH_COLOR;
+  HINT_TEXT_ALLOW_UNDO;
+  HINT_TEXT_ALLOW_SMART_QUOTES;
+  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+  /*HINT_EXPAND_HEIGHT_TO_FIT_PARENT; */
+  ATTR_GEN_TEXT_SELECTABLE;
+  ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BISON);
+}
+
+@object GenInteractionClass PhotoMainUI = {
+  GI_comp = @PhotoSelectionGroup, @PhotoSinglePage;
+  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+}
+
+@object GenInteractionClass PhotoSelectionGroup = {
+  GI_comp = @PhotoSelectionText, @PhotoSelection, @PhotoUpDown;
+  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+  HINT_ORIENT_CHILDREN_VERTICALLY;
+}
+
+@object GenGlyphClass @PhotoSelectionText = {
+  GI_visMoniker = "Files found:";
+}
+
+@object GenDynamicListClass PhotoSelection = {
+  /* Message and destination for when user-made changes are applied to
+   * the list. */
+  GIGI_applyMsg = MSG_GDLP_LIST_APPLY;
+  GIGI_destination = process;
+  
+  /* Message to send to GIGI_destination to get a moniker for an item. */
+  GDLI_queryMsg = MSG_GDLP_LIST_MONIKER_QUERY;
+  GDLI_numItems = 0;
+  GIGI_numSelections = 1;
+  /* Make the list scrollable. */
+  HINT_ITEM_GROUP_SCROLLABLE;
+  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+}
+
+@object GenInteractionClass PhotoUpDown = {
+  GI_comp = @PhotoDown, @PhotoUp;
+  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+  HINT_CENTER_CHILDREN_HORIZONTALLY;
+}
+
+@object GenTriggerClass PhotoDown = {
+  GI_visMoniker = list { @PhotoDownTextMoniker, @PhotoDownIconMoniker }
+  GTI_actionMsg = MSG_PHOTO_DOWN;
+  GTI_destination = process;
+  HINT_CENTER_MONIKER;
+  /*ATTR_GEN_TRIGGER_IMMEDIATE_ACTION;*/
+}
+
+@object GenTriggerClass PhotoUp = {
+  GI_visMoniker = list { @PhotoUpTextMoniker, @PhotoUpIconMoniker }
+  GTI_actionMsg = MSG_PHOTO_UP;
+  GTI_destination = process;
+  HINT_CENTER_MONIKER;
+  /*ATTR_GEN_TRIGGER_IMMEDIATE_ACTION;*/
+}
+
+@object GenInteractionClass PhotoSinglePage = {
+  GI_comp = @PhotoNameText, @PhotoName, @PhotoTitleText, @PhotoTitle, @PhotoCommentText, @PhotoComment;
+  HINT_ORIENT_CHILDREN_VERTICALLY;
+  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+  HINT_DIVIDE_HEIGHT_EQUALLY;
+}
+
+@object GenGlyphClass PhotoNameText = {
+  GI_visMoniker = "Picture: Filename (Read Only):";
+}
+
+@object GenGlyphClass PhotoTitleText = {
+  GI_visMoniker = "Picture: Title:";
+}
+
+@object GenGlyphClass PhotoCommentText = {
+  GI_visMoniker = "Picture: Comment:";
+}
+
+@object GenTextClass PhotoStatusText = {
+  GI_attrs = @default | GA_TARGETABLE | GA_READ_ONLY;
+  GTXI_attrs = (GTA_USE_TAB_FOR_NAVIGATION | GTA_NO_WORD_WRAPPING) | ( GTA_DONT_SCROLL_TO_CHANGES | GTA_INIT_SCROLLING );
+  GTXI_text = "Loading. Please wait...";
+  HINT_TEXT_FRAME;
+  HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+  ATTR_GEN_TEXT_DOES_NOT_ACCEPT_INK;
+  ATTR_GEN_TEXT_SELECTABLE;
+  ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BISON);
+}
+
+@object GenTextClass PhotoName = {
+  GI_attrs = @default | GA_TARGETABLE | GA_READ_ONLY;
+  GTXI_attrs = (GTA_USE_TAB_FOR_NAVIGATION | GTA_NO_WORD_WRAPPING) | ( GTA_SINGLE_LINE_TEXT );
+  GTXI_text = "Filename";
+  GTXI_maxLength = MYFILELENGTH;
+  HINT_TEXT_FRAME;
+  HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+  /*HINT_EXPAND_HEIGHT_TO_FIT_PARENT; */
+  ATTR_GEN_TEXT_DOES_NOT_ACCEPT_INK;
+  ATTR_GEN_TEXT_SELECTABLE;
+  ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BISON);
+}
+
+@object GenTextClass PhotoTitle = {
+  GI_attrs = @default | GA_TARGETABLE;
+  GTXI_attrs = (GTA_USE_TAB_FOR_NAVIGATION | GTA_NO_WORD_WRAPPING) | ( GTA_SINGLE_LINE_TEXT );
+  GTXI_text = "Title";
+  GTXI_maxLength = MYFILELENGTH;
+  HINT_TEXT_FRAME;
+  HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+  HINT_TEXT_WHITE_WASH_COLOR;
+  HINT_TEXT_ALLOW_UNDO;
+  HINT_TEXT_ALLOW_SMART_QUOTES;
+  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+  /*HINT_EXPAND_HEIGHT_TO_FIT_PARENT; */
+  ATTR_GEN_TEXT_SELECTABLE;
+  ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BISON);
+}
+
+@object GenTextClass PhotoComment = {
+  GI_attrs = @default | GA_TARGETABLE;
+  GTXI_attrs = (GTA_USE_TAB_FOR_NAVIGATION | GTA_NO_WORD_WRAPPING) | ( GTA_DONT_SCROLL_TO_CHANGES | GTA_INIT_SCROLLING );
+  GTXI_text = "Comment";
+  GTXI_maxLength = 254;
+  HINT_TEXT_FRAME;
+  HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+  HINT_TEXT_WHITE_WASH_COLOR;
+  HINT_TEXT_ALLOW_UNDO;
+  HINT_TEXT_ALLOW_SMART_QUOTES;
+  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+  ATTR_GEN_TEXT_SELECTABLE;
+  ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BISON);
+}
+
+@object GenInteractionClass PhotoOverwrite = {
+  GI_comp = @PhotoOverwriteText;
+  GII_type = GIT_AFFIRMATION;
+  GII_visibility = GIV_DIALOG;
+  GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+}
+
+@object GenGlyphClass PhotoOverwriteText = {
+  GI_visMoniker = "Overwrite existing HTML-file(s)?";
+}
+
+@object GenInteractionClass PhotoFileMenu = {
+  GI_comp = @PhotoFileSave;
+  GII_visibility = GIV_POPUP;
+  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_FILE_MENU);
+}
+
+@object GenTriggerClass PhotoFileSave = {
+  GI_visMoniker = 'S',"Save";
+  /* GI_kbdAccelerator = ctrl 's'; */
+  GTI_actionMsg = MSG_PHOTO_SAVE;
+  GTI_destination = process;
+  /*ATTR_GEN_TRIGGER_IMMEDIATE_ACTION;*/
+}
+
+@object GenInteractionClass PhotoEditGroup = {
+  GI_comp = @PhotoEditControl;
+  GII_visibility = GIV_POPUP;
+  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_EDIT_MENU);
+}
+
+@object GenEditControlClass PhotoEditControl = {
+  GII_visibility = GIV_SUB_GROUP;
+}
+
+@object GenInteractionClass PhotoOptions = {
+  GI_comp = @PhotoGeneralOptions, @PhotoLeftOptions, @PhotoClearAllComments;
+  GII_visibility = GIV_POPUP;
+  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_OPTIONS_MENU);
+}
+
+@object GenInteractionClass PhotoGeneralOptions = {
+  GI_visMoniker = 'G',"General Settings";
+  GI_comp = @PhotoHROptions, @PhotoBodyOptions, @PhotoRobotOptions, @PhotoAllBoolOptions;
+  GII_visibility = GIV_POPUP;
+}
+
+@object GenInteractionClass PhotoRobotOptions = {
+  GI_visMoniker = 'R',"Robot-Settings";
+  GI_comp = @PhotoRobotBoolOptions;
+  GII_visibility = GIV_POPUP;
+}
+
+@object GenBooleanGroupClass PhotoRobotBoolOptions = {
+  GI_comp = @PhotoRobotAll,
+            @PhotoRobotIndex,
+            @PhotoRobotFollow;
+  HINT_BOOLEAN_GROUP_CHECKBOX_STYLE;
+}
+
+@object GenBooleanClass PhotoRobotAll = {
+  GI_visMoniker = 'A',"All";
+  GBI_identifier = 1;
+}
+
+@object GenBooleanClass PhotoRobotIndex = {
+  GI_visMoniker = 'I',"Index";
+  GBI_identifier = 2;
+}
+
+@object GenBooleanClass PhotoRobotFollow = {
+  GI_visMoniker = 'F',"Follow";
+  GBI_identifier = 4;
+}
+
+@object GenInteractionClass PhotoHROptions = {
+  GI_visMoniker = 'H',"<HR>-Settings";
+  GI_comp = @PhotoHRBoolOptions, @PhotoOptionsHRWidthButton;
+  GII_visibility = GIV_POPUP;
+}
+ 
+@object GenBooleanGroupClass PhotoHRBoolOptions = {
+  GI_comp = @PhotoHRAboveAllPicsLink,
+            @PhotoHRBelowAllPicsLink,
+            @PhotoHRAboveTitle,
+            @PhotoHRBelowTitle,
+            @PhotoHRAboveComment,
+            @PhotoHRBelowComment,
+            @PhotoHROnAllPicsPage;
+  HINT_BOOLEAN_GROUP_CHECKBOX_STYLE;
+}
+
+@object GenBooleanClass PhotoHRAboveAllPicsLink = {
+  GI_visMoniker = 'A',"Above link to \"All Pics\"";
+  GBI_identifier = 1;
+}
+
+@object GenBooleanClass PhotoHRBelowAllPicsLink = {
+  GI_visMoniker = 'B',"Below link to \"All Pics\"";
+  GBI_identifier = 2;
+}
+
+@object GenBooleanClass PhotoHRAboveTitle = {
+  GI_visMoniker = 't',"Above title";
+  GBI_identifier = 4;
+}
+
+@object GenBooleanClass PhotoHRBelowTitle = {
+  GI_visMoniker = 'e',"Below title";
+  GBI_identifier = 8;
+}
+
+@object GenBooleanClass PhotoHRAboveComment = {
+  GI_visMoniker = 'o',"Above comment";
+  GBI_identifier = 16;
+}
+
+@object GenBooleanClass PhotoHRBelowComment = {
+  GI_visMoniker = 'n',"Below comment";
+  GBI_identifier = 32;
+}
+
+@object GenBooleanClass PhotoHROnAllPicsPage = {
+  GI_visMoniker = 'P',"On \"All Pics\"-page";
+  GBI_identifier = 64;
+}
+
+@object GenTriggerClass PhotoOptionsHRWidthButton = {
+  GI_visMoniker = 'R', "<HR>'s width (in %)";
+  GTI_actionMsg = MSG_CHANGE_HRWIDTH;
+  GTI_destination = process;
+  /*ATTR_GEN_TRIGGER_IMMEDIATE_ACTION;*/
+  HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass PhotoOptionsHRWidthDialog = {
+  GI_visMoniker = "<HR>'s width (in %)";
+  GI_states = @default;
+  GI_comp = @PhotoOptionsHRWidth;
+  GII_type = GIT_NOTIFICATION;
+  GII_visibility = GIV_DIALOG;
+  GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+}
+
+@object GenValueClass PhotoOptionsHRWidth = {
+  GI_visMoniker = "<HR>'s width (in %):";
+  GVLI_value = MakeWWFixed(80.0);
+  GVLI_maximum = MakeWWFixed(100.0);
+  GVLI_minimum = MakeWWFixed(10.0);
+  GVLI_increment = MakeWWFixed(1.0);
+  GVLI_displayFormat = GVDF_INTEGER;
+}
+
+@object GenInteractionClass PhotoBodyOptions = {
+  GI_visMoniker = 'B',"<BODY>-Settings";
+  GI_comp = @PhotoBodyBoolOptions, @PhotoBodyColour, @PhotoBodyBack, @PhotoBodyTabOptions;
+  GII_visibility = GIV_POPUP;
+}
+
+@object GenBooleanGroupClass PhotoBodyBoolOptions = {
+  GI_comp = @PhotoUseColours, @PhotoUseBackGround, @PhotoUseTabs;
+  HINT_BOOLEAN_GROUP_CHECKBOX_STYLE;
+}
+
+@object GenBooleanClass PhotoUseColours = {
+  GI_visMoniker = 'c',"Use own colours";
+  GBI_identifier = 1;
+}
+
+@object GenBooleanClass PhotoUseBackGround = {
+  GI_visMoniker = 'b',"Use own backgrounds";
+  GBI_identifier = 2;
+}
+
+@object GenBooleanClass PhotoUseTabs = {
+  GI_visMoniker = 't',"Use tables";
+  GBI_identifier = 4;
+}
+
+@object GenTriggerClass PhotoBodyColour = {
+  GI_visMoniker = 'o',"Colours";
+  GTI_actionMsg = MSG_CHANGE_COLOURS;
+  GTI_destination = process;
+  /*ATTR_GEN_TRIGGER_IMMEDIATE_ACTION;*/
+  HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass PhotoBodyTabOptions = {
+  GI_visMoniker = 'T',"Table options";
+  GTI_actionMsg = MSG_SHOW_TABLEOPTIONS;
+  GTI_destination = process;
+  /*ATTR_GEN_TRIGGER_IMMEDIATE_ACTION;*/
+  HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenTriggerClass PhotoBodyBack = {
+  GI_visMoniker = 'a',"Background";
+  GTI_actionMsg = MSG_CHANGE_BACKGROUND;
+  GTI_destination = process;
+  /*ATTR_GEN_TRIGGER_IMMEDIATE_ACTION;*/
+  HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenBooleanGroupClass PhotoAllBoolOptions = {
+  GI_comp = @PhotoCreateAllPicsPage;
+  HINT_BOOLEAN_GROUP_CHECKBOX_STYLE;
+}
+
+@object GenBooleanClass PhotoCreateAllPicsPage = {
+  GI_visMoniker = 'A',"Create the \"All Pics\"-page";
+  GBI_identifier = 1;
+}
+
+@object GenInteractionClass PhotoLeftOptions = {
+  GI_visMoniker = 'L',"Left Page's Settings";
+  GI_comp = @PhotoListOptions;
+  GII_visibility = GIV_POPUP;
+}
+
+@object GenItemGroupClass PhotoListOptions = {
+  GI_comp = @PhotoUnorderedList,
+            @PhotoOrderedList,
+            @PhotoOrderedLista,
+            @PhotoOrderedListA,
+            @PhotoOrderedListi,
+            @PhotoOrderedListI,
+            @PhotoNoList;
+	GIGI_behaviorType = GIGBT_EXCLUSIVE;
+}
+
+@object GenItemClass PhotoUnorderedList = {
+  GI_visMoniker = 'U', "Unordered List";
+  GII_identifier = 1;
+}
+
+@object GenItemClass PhotoOrderedList = {
+  GI_visMoniker = '1', "Ordered List (1,2,3,...)";
+  GII_identifier = 2;
+}
+
+@object GenItemClass PhotoOrderedLista = {
+  GI_visMoniker = 'd', "Ordered List (a,b,c,...)";
+  GII_identifier = 4;
+}
+
+@object GenItemClass PhotoOrderedListA = {
+  GI_visMoniker = ',', "Ordered List (A,B,C,...)";
+  GII_identifier = 8;
+}
+
+@object GenItemClass PhotoOrderedListi = {
+  GI_visMoniker = '(', "Ordered List (i,ii,iii,...)";
+  GII_identifier = 16;
+}
+
+@object GenItemClass PhotoOrderedListI = {
+  GI_visMoniker = ')', "Ordered List (I,II,III,...)";
+  GII_identifier = 32;
+}
+
+@object GenItemClass PhotoNoList = {
+  GI_visMoniker = 's', "No list";
+  GII_identifier = 64;
+}
+
+@object GenTriggerClass PhotoClearAllComments = {
+  GI_visMoniker = 'l',"Clear all comments";
+  GTI_actionMsg = MSG_CLEAR_ALL_COMMENTS;
+  GTI_destination = process;
+  /*ATTR_GEN_TRIGGER_IMMEDIATE_ACTION;*/
+}
+
+/*@object GenInteractionClass PhotoTableOptionsDialog = {
+  GI_visMoniker = "Table Options";
+  GI_states = @default;
+  //GI_comp = @PhotoOptionsHRWidth;
+  GII_type = GIT_NOTIFICATION;
+  GII_visibility = GIV_DIALOG;
+  GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+}*/
+
+@object GenInteractionClass PhotoTableOptionsDialog = {
+  GI_visMoniker = "Table Options:";
+  GI_comp = @PhotoTableBGColor, @PhotoTableBorderSize;
+  GII_type = GIT_AFFIRMATION;
+  GII_visibility = GIV_DIALOG;
+  GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+  ATTR_GEN_HELP_CONTEXT = "Tables";
+  HINT_RIGHT_JUSTIFY_CHILDREN;
+  HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenTextClass PhotoTableBGColor = {
+  GI_visMoniker = "Background: #";
+  GI_attrs = @default | GA_TARGETABLE;
+  GTXI_attrs = (GTA_USE_TAB_FOR_NAVIGATION | GTA_NO_WORD_WRAPPING) | ( GTA_SINGLE_LINE_TEXT );
+  GTXI_text = "";
+  GTXI_maxLength = 6;
+  HINT_TEXT_FRAME;
+  HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+  HINT_TEXT_WHITE_WASH_COLOR;
+  HINT_TEXT_ALLOW_UNDO;
+  HINT_TEXT_ALLOW_SMART_QUOTES;
+  ATTR_GEN_TEXT_SELECTABLE;
+  ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BISON);
+  HINT_FIXED_SIZE = SST_WIDE_CHAR_WIDTHS | 6;
+}
+
+@object GenValueClass PhotoTableBorderSize = {
+  GI_visMoniker = "Border (in pixel):";
+  GVLI_value = MakeWWFixed(5.0);
+  GVLI_maximum = MakeWWFixed(20.0);
+  GVLI_minimum = MakeWWFixed(0.0);
+  GVLI_increment = MakeWWFixed(1.0);
+  GVLI_displayFormat = GVDF_INTEGER;
+}
+
+@object GenInteractionClass PhotoColourDialog = {
+  GI_visMoniker = "Colours:";
+  GI_comp = @PhotoBGColorText, @PhotoTextText, @PhotoLinkText, @PhotoVLinkText, @PhotoALinkText;
+  GII_type = GIT_AFFIRMATION;
+  GII_visibility = GIV_DIALOG;
+  GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+  ATTR_GEN_HELP_CONTEXT = "Colours";
+  HINT_RIGHT_JUSTIFY_CHILDREN;
+  HINT_NO_WIDER_THAN_CHILDREN_REQUIRE;
+}
+
+@object GenTextClass PhotoBGColorText = {
+  GI_visMoniker = "Background: #";
+  GI_attrs = @default | GA_TARGETABLE;
+  GTXI_attrs = (GTA_USE_TAB_FOR_NAVIGATION | GTA_NO_WORD_WRAPPING) | ( GTA_SINGLE_LINE_TEXT );
+  GTXI_text = "";
+  GTXI_maxLength = 6;
+  HINT_TEXT_FRAME;
+  HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+  HINT_TEXT_WHITE_WASH_COLOR;
+  HINT_TEXT_ALLOW_UNDO;
+  HINT_TEXT_ALLOW_SMART_QUOTES;
+  ATTR_GEN_TEXT_SELECTABLE;
+  ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BISON);
+  HINT_FIXED_SIZE = SST_WIDE_CHAR_WIDTHS | 6;
+}
+
+@object GenTextClass PhotoTextText = {
+  GI_visMoniker = "Text: #";
+  GI_attrs = @default | GA_TARGETABLE;
+  GTXI_attrs = (GTA_USE_TAB_FOR_NAVIGATION | GTA_NO_WORD_WRAPPING) | ( GTA_SINGLE_LINE_TEXT );
+  GTXI_text = "";
+  GTXI_maxLength = 6;
+  HINT_TEXT_FRAME;
+  HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+  HINT_TEXT_WHITE_WASH_COLOR;
+  HINT_TEXT_ALLOW_UNDO;
+  HINT_TEXT_ALLOW_SMART_QUOTES;
+  ATTR_GEN_TEXT_SELECTABLE;
+  ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BISON);
+  HINT_FIXED_SIZE = SST_WIDE_CHAR_WIDTHS | 6;
+}
+
+@object GenTextClass PhotoLinkText = {
+  GI_visMoniker = "Link: #";
+  GI_attrs = @default | GA_TARGETABLE;
+  GTXI_attrs = (GTA_USE_TAB_FOR_NAVIGATION | GTA_NO_WORD_WRAPPING) | ( GTA_SINGLE_LINE_TEXT );
+  GTXI_text = "";
+  GTXI_maxLength = 6;
+  HINT_TEXT_FRAME;
+  HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+  HINT_TEXT_WHITE_WASH_COLOR;
+  HINT_TEXT_ALLOW_UNDO;
+  HINT_TEXT_ALLOW_SMART_QUOTES;
+  ATTR_GEN_TEXT_SELECTABLE;
+  ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BISON);
+  HINT_FIXED_SIZE = SST_WIDE_CHAR_WIDTHS | 6;
+}
+
+@object GenTextClass PhotoVLinkText = {
+  GI_visMoniker = "Visited Link: #";
+  GI_attrs = @default | GA_TARGETABLE;
+  GTXI_attrs = (GTA_USE_TAB_FOR_NAVIGATION | GTA_NO_WORD_WRAPPING) | ( GTA_SINGLE_LINE_TEXT );
+  GTXI_text = "";
+  GTXI_maxLength = 6;
+  HINT_TEXT_FRAME;
+  HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+  HINT_TEXT_WHITE_WASH_COLOR;
+  HINT_TEXT_ALLOW_UNDO;
+  HINT_TEXT_ALLOW_SMART_QUOTES;
+  ATTR_GEN_TEXT_SELECTABLE;
+  ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BISON);
+  HINT_FIXED_SIZE = SST_WIDE_CHAR_WIDTHS | 6;
+}
+
+@object GenTextClass PhotoALinkText = {
+  GI_visMoniker = "Activated Link: #";
+  GI_attrs = @default | GA_TARGETABLE;
+  GTXI_attrs = (GTA_USE_TAB_FOR_NAVIGATION | GTA_NO_WORD_WRAPPING) | ( GTA_SINGLE_LINE_TEXT );
+  GTXI_text = "";
+  GTXI_maxLength = 6;
+  HINT_TEXT_FRAME;
+  HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+  HINT_TEXT_WHITE_WASH_COLOR;
+  HINT_TEXT_ALLOW_UNDO;
+  HINT_TEXT_ALLOW_SMART_QUOTES;
+  ATTR_GEN_TEXT_SELECTABLE;
+  ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BISON);
+  HINT_FIXED_SIZE = SST_WIDE_CHAR_WIDTHS | 6;
+}
+
+@object GenInteractionClass PhotoBackDialog = {
+  GI_visMoniker = "Background image";
+  GI_states = @default;
+  GI_comp = @PhotoBackText, @PhotoBackPath;
+  GII_type = GIT_AFFIRMATION;
+  GII_visibility = GIV_DIALOG;
+  GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+  ATTR_GEN_HELP_CONTEXT = "Background";
+}
+
+@object GenGlyphClass PhotoBackText = {
+	GI_visMoniker = "Path to background-image:";
+}
+
+@object GenTextClass PhotoBackPath = {
+  GI_attrs = @default | GA_TARGETABLE;
+  GTXI_attrs = (GTA_USE_TAB_FOR_NAVIGATION | GTA_NO_WORD_WRAPPING) | ( GTA_SINGLE_LINE_TEXT );
+  GTXI_text = "";
+  GTXI_maxLength = 255;
+  HINT_TEXT_FRAME;
+  HINT_TEXT_DO_NOT_MAKE_LARGER_ON_PEN_SYSTEMS;
+  HINT_TEXT_WHITE_WASH_COLOR;
+  HINT_TEXT_ALLOW_UNDO;
+  HINT_TEXT_ALLOW_SMART_QUOTES;
+  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+  /*HINT_EXPAND_HEIGHT_TO_FIT_PARENT; */
+  ATTR_GEN_TEXT_SELECTABLE;
+  ATTR_GEN_TEXT_DEFAULT_CHAR_ATTR = ((VTDS_18 << VTDCA_SIZE_OFFSET) | VTDF_BISON);
+}
+
+@object GenInteractionClass PhotoAboutMenu = {
+  GI_comp = @PhotoAbout;
+  GII_visibility = GIV_POPUP;
+  ATTR_GEN_INTERACTION_GROUP_TYPE = (GIGT_HELP_MENU);
+}
+
+@object GenTriggerClass PhotoAbout = {
+  GI_visMoniker = 'A',"About";
+  /* GI_kbdAccelerator = ctrl 'A'; */
+  GTI_actionMsg = MSG_PHOTO_ABOUT;
+  GTI_destination = process;
+  /*ATTR_GEN_TRIGGER_IMMEDIATE_ACTION;*/
+  HINT_TRIGGER_BRINGS_UP_WINDOW;
+}
+
+@object GenInteractionClass PhotoAboutDialog = {
+  GI_visMoniker = "About WebPhotos";
+  GI_states = @default;
+  GI_comp = @PhotoCopyIcon, @PhotoCopyText;
+  GII_type = GIT_NOTIFICATION;
+  GII_visibility = GIV_DIALOG;
+  GII_attrs = @default | GIA_INITIATED_VIA_USER_DO_DIALOG | GIA_NOT_USER_INITIATABLE | GIA_MODAL;
+  HINT_SIZE_WINDOW_AS_DESIRED;
+  HINT_ORIENT_CHILDREN_HORIZONTALLY;
+  ATTR_GEN_HELP_CONTEXT = "TOC";
+}
+
+@object GenGlyphClass PhotoCopyIcon = {
+  GI_visMoniker = list { @Moniker0, @Moniker1, @Moniker2 };
+}
+
+@object GenInteractionClass PhotoCopyText = {
+  GI_comp = @PhotoCopy1, @PhotoCopy2, @PhotoCopy3, @PhotoCopy4, @PhotoCopy5, @PhotoCopy6;
+  HINT_EXPAND_WIDTH_TO_FIT_PARENT;
+  HINT_EXPAND_HEIGHT_TO_FIT_PARENT;
+  HINT_ORIENT_CHILDREN_VERTICALLY;  
+}
+
+@object GenGlyphClass PhotoCopy1 = {
+  GI_visMoniker = "WebPhotos 0.8beta";
+}
+
+@object GenGlyphClass PhotoCopy2 = {
+  GI_visMoniker = "Copyright \xa9 2000-2012 J\x9arg Polzfu\xa7";
+}
+
+@object GenGlyphClass PhotoCopy3 = {
+  GI_visMoniker = "Released under the version 2 of the";
+}
+
+@object GenGlyphClass PhotoCopy4 = {
+  GI_visMoniker = "GNU General Public License in 2004.";
+}
+
+@object GenGlyphClass PhotoCopy5 = {
+  GI_visMoniker = "Portions of the compiled program are Copyright";
+}
+
+@object GenGlyphClass PhotoCopy6 = {
+  GI_visMoniker = "\xa9 Geoworks 1993, 1994 and used by permission.";
+}
+
+@end Interface;
